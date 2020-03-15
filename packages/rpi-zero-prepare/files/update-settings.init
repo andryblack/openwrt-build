@@ -1,0 +1,57 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2009-2014 OpenWrt.org
+
+START=90
+STOP=10
+
+boot() {
+
+    if [ -f /boot/reset.txt ]; then
+		firstboot -y
+		echo "force firstboot"
+		rm -f /boot/reset.txt
+		reboot -d 0
+		exit 0
+	fi
+
+	if [ -f /boot/setup.txt ]; then
+		crnt_ssid=`uci get wireless.@wifi-iface[0].ssid`
+		crnt_key=`uci get wireless.@wifi-iface[0].key`
+		crnt_host=`uci get system.@system[0].hostname`
+		source /boot/setup.txt
+
+		if [ "x$host" != "x" ] && [ "x$crnt_host" != "x$host" ]; then
+			uci set system.@system[0].hostname=$host
+			uci commit system
+			/etc/init.d/system restart
+			if [ -f /etc/init.d/avahi-daemon ]; then
+				/etc/init.d/avahi-daemon restart
+			fi
+		fi
+
+
+		commit_wireless="no"
+		if [ "x$ssid" != "x" ] && [ "x$crnt_ssid" != "x$ssid" ]; then
+			uci set wireless.@wifi-iface[0].ssid=$ssid
+			commit_wireless="yes"
+		fi
+		if [ "x$key" != "x" ] && [ "x$crnt_key" != "x$key" ]; then
+			uci set wireless.@wifi-iface[0].key=$key
+			commit_wireless="yes"
+		fi
+		if [ "x$commit_wireless" != "xno" ]; then
+			uci commit wireless
+			/etc/init.d/network restart
+		fi
+		
+	fi
+    exit 0
+}
+
+start() {
+	exit 0
+}
+
+stop() {
+	exit 0
+}

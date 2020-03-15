@@ -1,0 +1,18 @@
+#!/bin/sh
+uci set wireless.radio0.country='RU'
+uci set wireless.radio0.disabled=0
+uci set wireless.@wifi-device[0].disabled='0'
+uci set wireless.@wifi-iface[0].encryption='psk2'
+uci set wireless.@wifi-iface[0].mode='sta'
+uci set wireless.@wifi-iface[0].network='lan'
+uci set wireless.@wifi-iface[0].ssid='openwrt'
+uci set wireless.@wifi-iface[0].key='openwrt1234'
+uci commit wireless
+uci set network.@interface[1].ifname='wlan0'
+uci set network.@interface[1].proto='dhcp'
+uci delete network.@interface[1].type
+uci delete network.@interface[1].ipaddr
+uci delete network.@interface[1].netmask
+uci delete network.@interface[1].ip6assign
+uci commit network
+exit 0

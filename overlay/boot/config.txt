@@ -1,0 +1,6 @@
+tparam=i2c_arm=off
+dtparam=spi=off
+dtparam=audio=off
+dtoverlay=dwc2
+dtoverlay=disable-bt
+enable_uart=1

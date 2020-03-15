@@ -1,0 +1,10 @@
+prefix=/usr
+libdir=${prefix}/lib
+includedir=${prefix}/include/lua5.3
+version=5.3.5
+	
+Name: lua-5.3
+Version: ${version}
+Description: Lua language
+Libs: -L${libdir} -llua5.3
+Cflags: -I${includedir}

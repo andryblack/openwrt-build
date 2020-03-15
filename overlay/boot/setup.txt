@@ -1,0 +1,3 @@
+host=blackbox
+ssid=wifi-name
+key=fifi-pass

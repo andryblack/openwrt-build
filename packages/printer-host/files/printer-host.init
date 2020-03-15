@@ -1,0 +1,24 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2009-2014 OpenWrt.org
+
+START=92
+STOP=10
+USE_PROCD=1
+
+boot() {
+    iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 8080
+    start "$@"
+    exit 0
+}
+
+start_service() {
+    procd_open_instance
+    procd_set_param command /usr/bin/printer-host \
+    	/usr/share/printer-host/app/main.lua \
+    	--config=/usr/share/printer-host/config.lua
+    procd_set_param respawn
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_set_param user printhost
+    procd_close_instance
+}
