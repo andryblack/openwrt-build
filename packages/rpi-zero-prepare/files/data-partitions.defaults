@@ -1,13 +1,18 @@
 #!/bin/sh
 
+
+
 crnt_blocks=`block info | grep "/dev/mmcblk0p3"`
 if [ "x$crnt_blocks" == "x" ]; then
 	echo "make new partition";
+
+DATA_PARTITION_OFFSET=2097152 # after 1Gb
+
 sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk /dev/mmcblk0
   n # new partition
   p # primary partition
   3 # partition number 1
-  802816  # default - start at beginning of disk 
+  $(DATA_PARTITION_OFFSET)  # rest of disk
     # default all
   w # write the partition table
 EOF
