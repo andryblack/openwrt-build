@@ -286,6 +286,7 @@ define Package/omxplayer/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_DIR) $(1)/usr/lib/omxplayer
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/omxplayer $(1)/usr/bin/
+	
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/omxplayer.bin $(1)/usr/bin/
 	$(CP) -P $(PKG_BUILD_DIR)/ffmpeg_compiled/usr/local/lib/*.so* $(1)/usr/lib/omxplayer/
 endef

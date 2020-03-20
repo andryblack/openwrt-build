@@ -16,7 +16,7 @@ define Package/rpi-zero-prepare
   SECTION:=base
   CATEGORY:=Base system
   TITLE:=Initialize RPi zero
-  DEPENDS:=+fdisk
+  DEPENDS:=+fdisk +e2fsprogs +uci +kmod-usb-gadget-serial
 endef
 
 define Package/rpi-zero-prepare/description
