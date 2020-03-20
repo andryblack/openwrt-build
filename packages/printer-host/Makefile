@@ -11,7 +11,7 @@ PKG_VERSION:=1.0.0
 PKG_RELEASE:=2
 
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=git@github.com:andryblack/printer-host.git
+PKG_SOURCE_URL:=https://github.com/andryblack/printer-host.git
 PKG_SOURCE_VERSION:=5d020b79b9b2d6411cacb4afa0a183e9f1fab4d2
 PKG_BUILD_DIR:=$(BUILD_DIR)/printer-host-$(PKG_VERSION)
 
