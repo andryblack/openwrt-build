@@ -1,0 +1,30 @@
+From bc5f858c991bd683e725b51434736c226df4ffbc Mon Sep 17 00:00:00 2001
+From: andryblack <blackicebox@gmail.com>
+Date: Sat, 21 Mar 2020 22:54:11 +0300
+Subject: [PATCH] tvservice: Fix freeze on old firmware.
+
+This fixes infinity loop at tvservice_wait_for_reply on initialize
+with older firmare. [E] No multi display support in firmware!
+Checked with `tvservice --list`
+---
+ interface/vmcs_host/vc_vchi_tvservice.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/interface/vmcs_host/vc_vchi_tvservice.c b/interface/vmcs_host/vc_vchi_tvservice.c
+index c749164..0c0ac2f 100644
+--- a/interface/vmcs_host/vc_vchi_tvservice.c
++++ b/interface/vmcs_host/vc_vchi_tvservice.c
+@@ -603,7 +603,9 @@ static int32_t tvservice_wait_for_reply(void *response, uint32_t max_length, uin
+       //Check if there is something in the queue, if so return immediately
+       //otherwise wait for the semaphore and read again
+       success = vchi_msg_dequeue( tvservice_client.client_handle[0], response, max_length, &length_read, VCHI_FLAGS_NONE );
+-   } while( length_read == 0 && vcos_event_wait(&tvservice_message_available_event) == VCOS_SUCCESS);
++   } while( (success == VCOS_SUCCESS) &&
++            (length_read == 0) && 
++            (vcos_event_wait(&tvservice_message_available_event) == VCOS_SUCCESS));
+    if(length_read) {
+       vcos_log_trace("TV service got reply %d bytes", length_read);
+    } else {
+-- 
+2.21.1 (Apple Git-122.3)
+
