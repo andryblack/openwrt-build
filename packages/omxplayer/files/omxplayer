@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# OMXPlayer launcher script.
+#
+
+OMXPLAYER_DIR=`dirname $0`
+OMXPLAYER_BIN="$OMXPLAYER_DIR/omxplayer.bin"
+OMXPLAYER_LIBS="/opt/vc/lib:/usr/lib/omxplayer"
+
+LD_LIBRARY_PATH="$OMXPLAYER_LIBS" $OMXPLAYER_BIN "$@"
+RESULT=$?
+
+exit $RESULT

@@ -8,7 +8,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=omxplayer
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/popcornmix/omxplayer.git
@@ -23,7 +23,7 @@ define Package/omxplayer
   CATEGORY:=Applications
   TITLE:=omxplayer
   URL:=https://github.com/popcornmix/omxplayer/
-  DEPENDS:=+rpi-userland +libopenssl +alsa-lib +libpcre +boost +getopt +libfreetype +dbus +libbz2 +bash
+  DEPENDS:=+rpi-userland +libopenssl +alsa-lib +libpcre +boost +getopt +libfreetype +libbz2 
 endef
 
 define Package/omxplayer/description
@@ -277,7 +277,8 @@ define Build/Compile
 		RANLIB="$(TARGET_CROSS)ranlib" \
 		SDKSTAGE=$(STAGING_DIR) \
 		STRIP="$(TARGET_CROSS)strip" \
-		INCLUDES="-I./ -Ilinux -Iffmpeg_compiled/usr/local/include/ -I$(STAGING_DIR)/usr/include/freetype2 -I$(STAGING_DIR)/usr/include/dbus-1.0 -I$(STAGING_DIR)/usr/lib/dbus-1.0/include -isystem$(STAGING_DIR)/opt/vc/include -isystem$(STAGING_DIR)/opt/vc/include/interface/vcos/pthreads" \
+		NO_DBUS=1 \
+		INCLUDES="-I./ -Ilinux -Iffmpeg_compiled/usr/local/include/ -I$(STAGING_DIR)/usr/include/freetype2 -isystem$(STAGING_DIR)/opt/vc/include -isystem$(STAGING_DIR)/opt/vc/include/interface/vcos/pthreads" \
 		dist
 endef
 
@@ -285,10 +286,14 @@ define Package/omxplayer/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_DIR) $(1)/usr/lib/omxplayer
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/omxplayer $(1)/usr/bin/
-	
+	$(INSTALL_DIR) $(1)/usr/share
+	$(INSTALL_DIR) $(1)/usr/share/fonts/truetype/freefont
+
+	$(INSTALL_BIN) ./files/omxplayer $(1)/usr/bin/
+
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/omxplayer.bin $(1)/usr/bin/
 	$(CP) -P $(PKG_BUILD_DIR)/ffmpeg_compiled/usr/local/lib/*.so* $(1)/usr/lib/omxplayer/
+	$(CP) -P $(PKG_BUILD_DIR)/fonts/*.ttf $(1)/usr/share/fonts/truetype/freefont/
 endef
 
 $(eval $(call BuildPackage,omxplayer,+libbz2))

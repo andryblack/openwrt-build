@@ -1,0 +1,292 @@
+From c1329cd2c35687eedbea462ccd3fe93937b257fd Mon Sep 17 00:00:00 2001
+From: andryblack <blackicebox@gmail.com>
+Date: Sat, 21 Mar 2020 23:53:14 +0300
+Subject: [PATCH] allow build without dbus
+
+---
+ Keyboard.cpp   | 15 ++++++++++++++-
+ Keyboard.h     |  6 ++++++
+ Makefile       | 15 +++++++++++++--
+ OMXControl.cpp | 25 +++++++++++++++++++------
+ OMXControl.h   |  7 ++++++-
+ 5 files changed, 58 insertions(+), 10 deletions(-)
+
+diff --git a/Keyboard.cpp b/Keyboard.cpp
+index d940421..5865aad 100644
+--- a/Keyboard.cpp
++++ b/Keyboard.cpp
+@@ -6,7 +6,9 @@
+ #include <string.h>
+ #include <unistd.h>
+ #include <fcntl.h>
++#ifndef NO_DBUS
+ #include <dbus/dbus.h>
++#endif
+ #include <errno.h>
+ 
+ #include "utils/log.h"
+@@ -35,6 +37,7 @@ Keyboard::Keyboard()
+     fcntl(STDIN_FILENO, F_SETFL, orig_fl | O_NONBLOCK);
+   }
+ 
++#ifndef NO_DBUS
+   if (dbus_connect() < 0)
+   {
+     CLog::Log(LOGWARNING, "Keyboard: DBus connection failed");
+@@ -45,6 +48,7 @@ Keyboard::Keyboard()
+   }
+ 
+   dbus_threads_init_default();
++#endif
+   Create();
+   m_action = -1;
+ }
+@@ -60,7 +64,9 @@ void Keyboard::Close()
+   {
+     StopThread();
+   }
++#ifndef NO_DBUS
+   dbus_disconnect();
++#endif
+   restore_term();
+ }
+ 
+@@ -90,8 +96,10 @@ void Keyboard::Process()
+ {
+   while(!m_bStop)
+   {
++#ifndef NO_DBUS
+     if (conn)
+       dbus_connection_read_write_dispatch(conn, 0);
++#endif
+     int ch[8];
+     int chnum = 0;
+ 
+@@ -118,6 +126,7 @@ int Keyboard::getEvent()
+ 
+ void Keyboard::send_action(int action) 
+ {
++#ifndef NO_DBUS
+   DBusMessage *message = NULL, *reply = NULL;
+   DBusError error;
+   m_action = action;
+@@ -159,6 +168,9 @@ fail:
+ 
+   if (reply)
+     dbus_message_unref(reply);
++#else
++  m_action = action;
++#endif
+ }
+ 
+ void Keyboard::setKeymap(std::map<int,int> keymap) 
+@@ -170,7 +182,7 @@ void Keyboard::setDbusName(std::string dbus_name)
+ {
+   m_dbus_name = dbus_name;
+ }
+-
++#ifndef NO_DBUS
+ int Keyboard::dbus_connect() 
+ {
+   DBusError error;
+@@ -210,3 +222,4 @@ void Keyboard::dbus_disconnect()
+         conn = NULL;
+     }
+ }
++#endif
+diff --git a/Keyboard.h b/Keyboard.h
+index d2807f2..689b8c8 100644
+--- a/Keyboard.h
++++ b/Keyboard.h
+@@ -1,6 +1,8 @@
++#ifndef NO_DBUS
+ #define OMXPLAYER_DBUS_PATH_SERVER "/org/mpris/MediaPlayer2"  
+ #define OMXPLAYER_DBUS_INTERFACE_ROOT "org.mpris.MediaPlayer2"
+ #define OMXPLAYER_DBUS_INTERFACE_PLAYER "org.mpris.MediaPlayer2.Player"
++#endif
+ 
+ #include "OMXThread.h"
+ #include <map>
+@@ -11,7 +13,9 @@
+   struct termios orig_termios;
+   int orig_fl;
+   int m_action;
++#ifndef NO_DBUS
+   DBusConnection *conn;
++#endif
+   std::map<int,int> m_keymap;
+   std::string m_dbus_name;
+  public:
+@@ -26,6 +30,8 @@
+  private:
+   void restore_term();
+   void send_action(int action);
++#ifndef NO_DBUS
+   int dbus_connect();
+   void dbus_disconnect();
++#endif
+  };
+diff --git a/Makefile b/Makefile
+index 8d00dec..40f216a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -4,7 +4,18 @@ CFLAGS+=-std=c++0x -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DTARGET_POSIX
+ LDFLAGS=-L$(SDKSTAGE)/opt/vc/lib/
+ LDFLAGS+=-L./ -Lffmpeg_compiled/usr/local/lib/ -lc -lbrcmGLESv2 -lbrcmEGL -lbcm_host -lopenmaxil -lfreetype -lz -lasound
+ 
+-INCLUDES+=-I./ -Ilinux -Iffmpeg_compiled/usr/local/include/ -I /usr/include/dbus-1.0 -I /usr/lib/arm-linux-gnueabihf/dbus-1.0/include -I/usr/include/freetype2 -isystem$(SDKSTAGE)/opt/vc/include -isystem$(SDKSTAGE)/opt/vc/include/interface/vcos/pthreads
++INCLUDES+=-I./ -Ilinux -Iffmpeg_compiled/usr/local/include/  -I/usr/include/freetype2 -isystem$(SDKSTAGE)/opt/vc/include -isystem$(SDKSTAGE)/opt/vc/include/interface/vcos/pthreads
++
++LIBS=-lvchiq_arm -lvchostif -lvcos -lrt -lpthread -lavutil -lavcodec -lavformat -lswscale -lswresample -lpcre
++
++ifeq ($(NO_DBUS),)
++INCLUDES+=-I /usr/include/dbus-1.0
++INCLUDES+=-I /usr/lib/arm-linux-gnueabihf/dbus-1.0/include
++LIBS+=-ldbus-1
++else
++CFLAGS+=-DNO_DBUS
++endif
++
+ 
+ DIST ?= omxplayer-dist
+ STRIP ?= strip
+@@ -54,7 +65,7 @@ version:
+ 	bash gen_version.sh > version.h 
+ 
+ omxplayer.bin: version $(OBJS)
+-	$(CXX) $(LDFLAGS) -o omxplayer.bin $(OBJS) -lvchiq_arm -lvchostif -lvcos -ldbus-1 -lrt -lpthread -lavutil -lavcodec -lavformat -lswscale -lswresample -lpcre
++	$(CXX) $(LDFLAGS) -o omxplayer.bin $(OBJS) $(LIBS)
+ 	$(STRIP) omxplayer.bin
+ 
+ help.h: README.md Makefile
+diff --git a/OMXControl.cpp b/OMXControl.cpp
+index 7345d8b..324ee1c 100644
+--- a/OMXControl.cpp
++++ b/OMXControl.cpp
+@@ -3,8 +3,9 @@
+ #include <stdint.h>
+ #include <sys/mman.h>
+ #include <string.h>
++#ifndef NO_DBUS
+ #include <dbus/dbus.h>
+-
++#endif
+ #include <string>
+ #include <sstream>
+ #include <utility>
+@@ -89,7 +90,9 @@ OMXControl::OMXControl()
+ 
+ OMXControl::~OMXControl() 
+ {
++#ifndef NO_DBUS
+     dbus_disconnect();
++#endif
+ }
+ 
+ int OMXControl::init(OMXClock *m_av_clock, OMXPlayerAudio *m_player_audio, OMXPlayerSubtitles *m_player_subtitles, OMXReader *m_omx_reader, std::string& dbus_name)
+@@ -99,7 +102,7 @@ int OMXControl::init(OMXClock *m_av_clock, OMXPlayerAudio *m_player_audio, OMXPl
+   audio     = m_player_audio;
+   subtitles = m_player_subtitles;
+   reader    = m_omx_reader;
+-
++#ifndef NO_DBUS
+   if (dbus_connect(dbus_name) < 0)
+   {
+     CLog::Log(LOGWARNING, "DBus connection failed, trying alternate");
+@@ -123,15 +126,20 @@ int OMXControl::init(OMXClock *m_av_clock, OMXPlayerAudio *m_player_audio, OMXPl
+     CLog::Log(LOGDEBUG, "DBus connection succeeded");
+     dbus_threads_init_default();
+   }
++#else
++  ret = -1; /* direct use keyboard */
++#endif
+   return ret;
+ }
+ 
+ void OMXControl::dispatch()
+ {
++#ifndef NO_DBUS
+   if (bus)
+     dbus_connection_read_write(bus, 0);
++#endif
+ }
+-
++#ifndef NO_DBUS
+ int OMXControl::dbus_connect(std::string& dbus_name)
+ {
+   DBusError error;
+@@ -186,9 +194,10 @@ void OMXControl::dbus_disconnect()
+         bus = NULL;
+     }
+ }
+-
++#endif
+ OMXControlResult OMXControl::getEvent()
+ {
++#ifndef NO_DBUS
+   if (!bus)
+     return KeyConfig::ACTION_BLANK;
+ 
+@@ -201,10 +210,13 @@ OMXControlResult OMXControl::getEvent()
+   CLog::Log(LOGDEBUG, "Popped message member: %s interface: %s type: %d path: %s", dbus_message_get_member(m), dbus_message_get_interface(m), dbus_message_get_type(m), dbus_message_get_path(m) );
+   OMXControlResult result = handle_event(m);
+   dbus_message_unref(m);
+-
+   return result;
++#else
++  return KeyConfig::ACTION_BLANK;
++#endif
+ }
+-
++  
++#ifndef NO_DBUS
+ OMXControlResult OMXControl::handle_event(DBusMessage *m)
+ {
+   //----------------------------DBus root interface-----------------------------
+@@ -1300,3 +1312,4 @@ DBusHandlerResult OMXControl::dbus_respond_array(DBusMessage *m, const char *arr
+ 
+   return DBUS_HANDLER_RESULT_HANDLED;
+ }
++#endif
+diff --git a/OMXControl.h b/OMXControl.h
+index 91395bf..c8d15dd 100644
+--- a/OMXControl.h
++++ b/OMXControl.h
+@@ -1,8 +1,9 @@
++#ifndef NO_DBUS
+ #define OMXPLAYER_DBUS_PATH_SERVER "/org/mpris/MediaPlayer2"  
+ #define OMXPLAYER_DBUS_INTERFACE_ROOT "org.mpris.MediaPlayer2"
+ #define OMXPLAYER_DBUS_INTERFACE_PLAYER "org.mpris.MediaPlayer2.Player"
+-
+ #include <dbus/dbus.h>
++#endif
+ #include "OMXClock.h"
+ #include "OMXPlayerAudio.h"
+ #include "OMXPlayerSubtitles.h"
+@@ -29,7 +30,9 @@ public:
+ class OMXControl
+ {
+ protected:
++#ifndef NO_DBUS
+   DBusConnection     *bus;
++#endif
+   OMXClock           *clock;
+   OMXPlayerAudio     *audio;
+   OMXReader          *reader;
+@@ -41,6 +44,7 @@ public:
+   OMXControlResult getEvent();
+   void dispatch();
+ private:
++#ifndef NO_DBUS
+   int dbus_connect(std::string& dbus_name);
+   void dbus_disconnect();
+   OMXControlResult handle_event(DBusMessage *m);
+@@ -51,4 +55,5 @@ private:
+   DBusHandlerResult dbus_respond_boolean(DBusMessage *m, int b);
+   DBusHandlerResult dbus_respond_string(DBusMessage *m, const char *text);
+   DBusHandlerResult dbus_respond_array(DBusMessage *m, const char *array[], int size);
++#endif
+ };
+-- 
+2.21.1 (Apple Git-122.3)
+
