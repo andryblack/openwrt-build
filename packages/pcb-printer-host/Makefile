@@ -6,31 +6,31 @@
 #
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=printer-host
+PKG_NAME:=pcb-printer-host
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://github.com/andryblack/printer-host.git
-PKG_SOURCE_VERSION:=5d020b79b9b2d6411cacb4afa0a183e9f1fab4d2
-PKG_BUILD_DIR:=$(BUILD_DIR)/printer-host-$(PKG_VERSION)
+PKG_SOURCE_URL:=https://github.com/andryblack/pcb-printer-host.git
+PKG_SOURCE_VERSION:=1adcda74f8e781db86f84733df8c7cf0506d96fe
+PKG_BUILD_DIR:=$(BUILD_DIR)/pcb-printer-host-$(PKG_VERSION)
 
 #HOST_BUILD_DEPENDS:=premake/host
 PKG_BUILD_DEPENDS:=premake5/host lua53static
 
 include $(INCLUDE_DIR)/package.mk
 
-define Package/printer-host
+define Package/pcb-printer-host
   SECTION:=utils
   CATEGORY:=Applications
-  TITLE:=3D printing server
-  URL:=https://github.com/andryblack/printer-host
-  DEPENDS:=+libuv +yajl +libopenssl +librt +libstdcpp
+  TITLE:=PCB printing server
+  URL:=https://github.com/andryblack/pcb-printer-host
+  DEPENDS:=+libuv +yajl +libopenssl +librt +libstdcpp +rpi-userland +libpng +kmod-video-uvc
   USERID:=printhost:printhost
 endef
 
-define Package/printer-host/description
- 3D printing server
+define Package/pcb-printer-host/description
+ PCB printing server
 endef
 
 
@@ -49,13 +49,13 @@ define Build/Compile
 			CPPFLAGS="$(TARGET_CPPFLAGS)" \
 			CFLAGS="$(TARGET_CFLAGS)" \
 			CXXFLAGS="$(TARGET_CXXFLAGS)" \
-			LDFLAGS="$(TARGET_LDFLAGS)"
+			LDFLAGS="$(TARGET_LDFLAGS) -lvchiq_arm"
 	$(MAKE) -C $(PKG_BUILD_DIR) local-modules
 endef
 
-define Package/printer-host/install
+define Package/pcb-printer-host/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/printer-host $(1)/usr/bin
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/pcb-printer $(1)/usr/bin
 	$(INSTALL_DIR) $(1)/usr/share/$(PKG_NAME)
 	$(INSTALL_DIR) $(1)/usr/share/$(PKG_NAME)/lib
 	$(CP) $(PKG_BUILD_DIR)/extlib/router.lua/router.lua $(1)/usr/share/$(PKG_NAME)/lib
@@ -77,4 +77,4 @@ define Package/printer-host/install
 	$(INSTALL_BIN) ./files/$(PKG_NAME).defaults $(1)/etc/uci-defaults/99-$(PKG_NAME)
 endef
 
-$(eval $(call BuildPackage,printer-host))
+$(eval $(call BuildPackage,pcb-printer-host))

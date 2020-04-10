@@ -45,6 +45,17 @@ boot() {
 		fi
 		
 	fi
+	if [ -f /boot/usb-serial.txt ]; then
+		if [ ! -f /etc/modules.d/53-g-serial ]; then
+			echo "g_serial" > /etc/modules.d/53-g-serial
+			echo "ttyGS0::respawn:/sbin/getty -L -w -n 115200 /dev/ttyGS0" >> /etc/inittab
+		fi
+	else
+		if [ -f /etc/modules.d/53-g-serial ]; then
+			rm /etc/modules.d/53-g-serial
+		fi
+	fi
+
     exit 0
 }
 

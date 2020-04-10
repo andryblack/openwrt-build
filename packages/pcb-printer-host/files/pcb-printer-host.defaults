@@ -1,0 +1,10 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+mkdir -p /mnt/data/files
+chown -R printhost:printhost /mnt/data/files
+
+group_add_user dialout printhost
+
+exit 0

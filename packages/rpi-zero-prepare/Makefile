@@ -38,10 +38,10 @@ define Package/rpi-zero-prepare/install
 	$(INSTALL_BIN) ./files/update-settings.init $(1)/etc/init.d/update-settings
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./files/up-wifi.defaults $(1)/etc/uci-defaults/90-up-wifi
+	$(INSTALL_BIN) ./files/serial-clean.defaults $(1)/etc/uci-defaults/90-serial-clean
 	$(INSTALL_BIN) ./files/data-partitions.defaults $(1)/etc/uci-defaults/91-data-partitions
 	##sed '/^DATA_PARTITION_OFFSET /s/=.*$/= $(DATA_PARTITION_OFFSET)/' $(1)/etc/uci-defaults/91-data-partitions
 	$(INSTALL_DIR) $(1)/etc/modules.d
-	$(INSTALL_BIN) ./files/g_serial.module $(1)/etc/modules.d/53-g-serial
 endef
 
 $(eval $(call BuildPackage,rpi-zero-prepare))
