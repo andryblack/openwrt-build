@@ -8,11 +8,11 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=pcb-printer-host
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/andryblack/pcb-printer-host.git
-PKG_SOURCE_VERSION:=1adcda74f8e781db86f84733df8c7cf0506d96fe
+PKG_SOURCE_VERSION:=37eb03a22d23fac5b865ee524b7b4279cbf790da
 PKG_BUILD_DIR:=$(BUILD_DIR)/pcb-printer-host-$(PKG_VERSION)
 
 #HOST_BUILD_DEPENDS:=premake/host
