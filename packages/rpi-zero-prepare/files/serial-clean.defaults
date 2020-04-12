@@ -1,11 +1,11 @@
 #!/bin/sh
 
-if [ -f /boot/use-serial ]; then
+if [ -f /boot/use-serial.txt ]; then
 	echo "::sysinit:/etc/init.d/rcS S boot" > /etc/inittab
 	echo "::shutdown:/etc/init.d/rcS K shutdown" >> /etc/inittab
 	CMDLINE=`cat /boot/cmdline.txt | sed -e 's/console=[^ ]* //' | sed -e 's/kgdboc=[^ ]* //' | sed -e 's/console=[^ ]* //'`
 	echo "$CMDLINE" >/boot/cmdline.txt
-	rm /boot/use-serial
+	rm /boot/use-serial.txt
 fi
 
 exit 0

@@ -56,6 +56,17 @@ boot() {
 		fi
 	fi
 
+	if [ -f /boot/install.txt ]; then
+		opkg update
+		while read p; do
+		  opkg install p
+		done </boot/install.txt
+		rm /boot/install.txt
+		if [ -f /boot/diagnostic ]; then
+			logread > /boot/install-log.txt
+		fi
+	fi
+
     exit 0
 }
 
