@@ -29,6 +29,10 @@
 						[ "makedev", "/dev/%DEVNAME%", "0660", "dialout" ]
 					],
 					[ "if",
+						[ "eq", "DEVNAME", "vchiq" ],
+						[ "makedev", "/dev/%DEVNAME%", "0660", "video" ]
+					],
+					[ "if",
 						[ "has", "DEVNAME" ],
 						[ "makedev", "/dev/%DEVNAME%", "0600" ]
 					]
