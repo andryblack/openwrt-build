@@ -6,5 +6,6 @@ mkdir -p /mnt/data/files
 chown -R printhost:printhost /mnt/data/files
 
 group_add_user dialout printhost
+group_add_user video printhost
 
 exit 0
