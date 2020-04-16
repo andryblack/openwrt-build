@@ -26,7 +26,7 @@ define Package/pcb-printer-host
   TITLE:=PCB printing server
   URL:=https://github.com/andryblack/pcb-printer-host
   DEPENDS:=+libuv +yajl +libopenssl +librt +libstdcpp +rpi-userland +libpng +kmod-video-uvc
-  USERID:=printhost:printhost
+  USERID:=services:printhost
 endef
 
 define Package/pcb-printer-host/description

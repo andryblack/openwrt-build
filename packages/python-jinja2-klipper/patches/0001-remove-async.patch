@@ -1,0 +1,1196 @@
+diff -ruN Jinja2-2.10.1-orig/Jinja2.egg-info/SOURCES.txt Jinja2-2.10.1/Jinja2.egg-info/SOURCES.txt
+--- Jinja2-2.10.1-orig/Jinja2.egg-info/SOURCES.txt	2019-04-06 21:59:52.000000000 +0300
++++ Jinja2-2.10.1/Jinja2.egg-info/SOURCES.txt	2020-04-14 02:23:44.000000000 +0300
+@@ -82,8 +82,6 @@
+ jinja2/__init__.py
+ jinja2/_compat.py
+ jinja2/_identifier.py
+-jinja2/asyncfilters.py
+-jinja2/asyncsupport.py
+ jinja2/bccache.py
+ jinja2/compiler.py
+ jinja2/constants.py
+@@ -108,8 +106,6 @@
+ jinja2/visitor.py
+ tests/conftest.py
+ tests/test_api.py
+-tests/test_async.py
+-tests/test_asyncfilters.py
+ tests/test_bytecode_cache.py
+ tests/test_core_tags.py
+ tests/test_debug.py
+diff -ruN Jinja2-2.10.1-orig/jinja2/__init__.py Jinja2-2.10.1/jinja2/__init__.py
+--- Jinja2-2.10.1-orig/jinja2/__init__.py	2019-04-06 20:50:57.000000000 +0300
++++ Jinja2-2.10.1/jinja2/__init__.py	2020-04-14 02:22:02.000000000 +0300
+@@ -70,14 +70,3 @@
+     'evalcontextfilter', 'evalcontextfunction', 'make_logging_undefined',
+     'select_autoescape',
+ ]
+-
+-
+-def _patch_async():
+-    from jinja2.utils import have_async_gen
+-    if have_async_gen:
+-        from jinja2.asyncsupport import patch_all
+-        patch_all()
+-
+-
+-_patch_async()
+-del _patch_async
+diff -ruN Jinja2-2.10.1-orig/jinja2/asyncfilters.py Jinja2-2.10.1/jinja2/asyncfilters.py
+--- Jinja2-2.10.1-orig/jinja2/asyncfilters.py	2019-04-06 20:10:11.000000000 +0300
++++ Jinja2-2.10.1/jinja2/asyncfilters.py	1970-01-01 03:00:00.000000000 +0300
+@@ -1,146 +0,0 @@
+-from functools import wraps
+-
+-from jinja2.asyncsupport import auto_aiter
+-from jinja2 import filters
+-
+-
+-async def auto_to_seq(value):
+-    seq = []
+-    if hasattr(value, '__aiter__'):
+-        async for item in value:
+-            seq.append(item)
+-    else:
+-        for item in value:
+-            seq.append(item)
+-    return seq
+-
+-
+-async def async_select_or_reject(args, kwargs, modfunc, lookup_attr):
+-    seq, func = filters.prepare_select_or_reject(
+-        args, kwargs, modfunc, lookup_attr)
+-    if seq:
+-        async for item in auto_aiter(seq):
+-            if func(item):
+-                yield item
+-
+-
+-def dualfilter(normal_filter, async_filter):
+-    wrap_evalctx = False
+-    if getattr(normal_filter, 'environmentfilter', False):
+-        is_async = lambda args: args[0].is_async
+-        wrap_evalctx = False
+-    else:
+-        if not getattr(normal_filter, 'evalcontextfilter', False) and \
+-           not getattr(normal_filter, 'contextfilter', False):
+-            wrap_evalctx = True
+-        is_async = lambda args: args[0].environment.is_async
+-
+-    @wraps(normal_filter)
+-    def wrapper(*args, **kwargs):
+-        b = is_async(args)
+-        if wrap_evalctx:
+-            args = args[1:]
+-        if b:
+-            return async_filter(*args, **kwargs)
+-        return normal_filter(*args, **kwargs)
+-
+-    if wrap_evalctx:
+-        wrapper.evalcontextfilter = True
+-
+-    wrapper.asyncfiltervariant = True
+-
+-    return wrapper
+-
+-
+-def asyncfiltervariant(original):
+-    def decorator(f):
+-        return dualfilter(original, f)
+-    return decorator
+-
+-
+-@asyncfiltervariant(filters.do_first)
+-async def do_first(environment, seq):
+-    try:
+-        return await auto_aiter(seq).__anext__()
+-    except StopAsyncIteration:
+-        return environment.undefined('No first item, sequence was empty.')
+-
+-
+-@asyncfiltervariant(filters.do_groupby)
+-async def do_groupby(environment, value, attribute):
+-    expr = filters.make_attrgetter(environment, attribute)
+-    return [filters._GroupTuple(key, await auto_to_seq(values))
+-            for key, values in filters.groupby(sorted(
+-                await auto_to_seq(value), key=expr), expr)]
+-
+-
+-@asyncfiltervariant(filters.do_join)
+-async def do_join(eval_ctx, value, d=u'', attribute=None):
+-    return filters.do_join(eval_ctx, await auto_to_seq(value), d, attribute)
+-
+-
+-@asyncfiltervariant(filters.do_list)
+-async def do_list(value):
+-    return await auto_to_seq(value)
+-
+-
+-@asyncfiltervariant(filters.do_reject)
+-async def do_reject(*args, **kwargs):
+-    return async_select_or_reject(args, kwargs, lambda x: not x, False)
+-
+-
+-@asyncfiltervariant(filters.do_rejectattr)
+-async def do_rejectattr(*args, **kwargs):
+-    return async_select_or_reject(args, kwargs, lambda x: not x, True)
+-
+-
+-@asyncfiltervariant(filters.do_select)
+-async def do_select(*args, **kwargs):
+-    return async_select_or_reject(args, kwargs, lambda x: x, False)
+-
+-
+-@asyncfiltervariant(filters.do_selectattr)
+-async def do_selectattr(*args, **kwargs):
+-    return async_select_or_reject(args, kwargs, lambda x: x, True)
+-
+-
+-@asyncfiltervariant(filters.do_map)
+-async def do_map(*args, **kwargs):
+-    seq, func = filters.prepare_map(args, kwargs)
+-    if seq:
+-        async for item in auto_aiter(seq):
+-            yield func(item)
+-
+-
+-@asyncfiltervariant(filters.do_sum)
+-async def do_sum(environment, iterable, attribute=None, start=0):
+-    rv = start
+-    if attribute is not None:
+-        func = filters.make_attrgetter(environment, attribute)
+-    else:
+-        func = lambda x: x
+-    async for item in auto_aiter(iterable):
+-        rv += func(item)
+-    return rv
+-
+-
+-@asyncfiltervariant(filters.do_slice)
+-async def do_slice(value, slices, fill_with=None):
+-    return filters.do_slice(await auto_to_seq(value), slices, fill_with)
+-
+-
+-ASYNC_FILTERS = {
+-    'first':        do_first,
+-    'groupby':      do_groupby,
+-    'join':         do_join,
+-    'list':         do_list,
+-    # we intentionally do not support do_last because that would be
+-    # ridiculous
+-    'reject':       do_reject,
+-    'rejectattr':   do_rejectattr,
+-    'map':          do_map,
+-    'select':       do_select,
+-    'selectattr':   do_selectattr,
+-    'sum':          do_sum,
+-    'slice':        do_slice,
+-}
+diff -ruN Jinja2-2.10.1-orig/jinja2/asyncsupport.py Jinja2-2.10.1/jinja2/asyncsupport.py
+--- Jinja2-2.10.1-orig/jinja2/asyncsupport.py	2019-04-06 20:10:11.000000000 +0300
++++ Jinja2-2.10.1/jinja2/asyncsupport.py	1970-01-01 03:00:00.000000000 +0300
+@@ -1,256 +0,0 @@
+-# -*- coding: utf-8 -*-
+-"""
+-    jinja2.asyncsupport
+-    ~~~~~~~~~~~~~~~~~~~
+-
+-    Has all the code for async support which is implemented as a patch
+-    for supported Python versions.
+-
+-    :copyright: (c) 2017 by the Jinja Team.
+-    :license: BSD, see LICENSE for more details.
+-"""
+-import sys
+-import asyncio
+-import inspect
+-from functools import update_wrapper
+-
+-from jinja2.utils import concat, internalcode, Markup
+-from jinja2.environment import TemplateModule
+-from jinja2.runtime import LoopContextBase, _last_iteration
+-
+-
+-async def concat_async(async_gen):
+-    rv = []
+-    async def collect():
+-        async for event in async_gen:
+-            rv.append(event)
+-    await collect()
+-    return concat(rv)
+-
+-
+-async def generate_async(self, *args, **kwargs):
+-    vars = dict(*args, **kwargs)
+-    try:
+-        async for event in self.root_render_func(self.new_context(vars)):
+-            yield event
+-    except Exception:
+-        exc_info = sys.exc_info()
+-    else:
+-        return
+-    yield self.environment.handle_exception(exc_info, True)
+-
+-
+-def wrap_generate_func(original_generate):
+-    def _convert_generator(self, loop, args, kwargs):
+-        async_gen = self.generate_async(*args, **kwargs)
+-        try:
+-            while 1:
+-                yield loop.run_until_complete(async_gen.__anext__())
+-        except StopAsyncIteration:
+-            pass
+-    def generate(self, *args, **kwargs):
+-        if not self.environment.is_async:
+-            return original_generate(self, *args, **kwargs)
+-        return _convert_generator(self, asyncio.get_event_loop(), args, kwargs)
+-    return update_wrapper(generate, original_generate)
+-
+-
+-async def render_async(self, *args, **kwargs):
+-    if not self.environment.is_async:
+-        raise RuntimeError('The environment was not created with async mode '
+-                           'enabled.')
+-
+-    vars = dict(*args, **kwargs)
+-    ctx = self.new_context(vars)
+-
+-    try:
+-        return await concat_async(self.root_render_func(ctx))
+-    except Exception:
+-        exc_info = sys.exc_info()
+-    return self.environment.handle_exception(exc_info, True)
+-
+-
+-def wrap_render_func(original_render):
+-    def render(self, *args, **kwargs):
+-        if not self.environment.is_async:
+-            return original_render(self, *args, **kwargs)
+-        loop = asyncio.get_event_loop()
+-        return loop.run_until_complete(self.render_async(*args, **kwargs))
+-    return update_wrapper(render, original_render)
+-
+-
+-def wrap_block_reference_call(original_call):
+-    @internalcode
+-    async def async_call(self):
+-        rv = await concat_async(self._stack[self._depth](self._context))
+-        if self._context.eval_ctx.autoescape:
+-            rv = Markup(rv)
+-        return rv
+-
+-    @internalcode
+-    def __call__(self):
+-        if not self._context.environment.is_async:
+-            return original_call(self)
+-        return async_call(self)
+-
+-    return update_wrapper(__call__, original_call)
+-
+-
+-def wrap_macro_invoke(original_invoke):
+-    @internalcode
+-    async def async_invoke(self, arguments, autoescape):
+-        rv = await self._func(*arguments)
+-        if autoescape:
+-            rv = Markup(rv)
+-        return rv
+-
+-    @internalcode
+-    def _invoke(self, arguments, autoescape):
+-        if not self._environment.is_async:
+-            return original_invoke(self, arguments, autoescape)
+-        return async_invoke(self, arguments, autoescape)
+-    return update_wrapper(_invoke, original_invoke)
+-
+-
+-@internalcode
+-async def get_default_module_async(self):
+-    if self._module is not None:
+-        return self._module
+-    self._module = rv = await self.make_module_async()
+-    return rv
+-
+-
+-def wrap_default_module(original_default_module):
+-    @internalcode
+-    def _get_default_module(self):
+-        if self.environment.is_async:
+-            raise RuntimeError('Template module attribute is unavailable '
+-                               'in async mode')
+-        return original_default_module(self)
+-    return _get_default_module
+-
+-
+-async def make_module_async(self, vars=None, shared=False, locals=None):
+-    context = self.new_context(vars, shared, locals)
+-    body_stream = []
+-    async for item in self.root_render_func(context):
+-        body_stream.append(item)
+-    return TemplateModule(self, context, body_stream)
+-
+-
+-def patch_template():
+-    from jinja2 import Template
+-    Template.generate = wrap_generate_func(Template.generate)
+-    Template.generate_async = update_wrapper(
+-        generate_async, Template.generate_async)
+-    Template.render_async = update_wrapper(
+-        render_async, Template.render_async)
+-    Template.render = wrap_render_func(Template.render)
+-    Template._get_default_module = wrap_default_module(
+-        Template._get_default_module)
+-    Template._get_default_module_async = get_default_module_async
+-    Template.make_module_async = update_wrapper(
+-        make_module_async, Template.make_module_async)
+-
+-
+-def patch_runtime():
+-    from jinja2.runtime import BlockReference, Macro
+-    BlockReference.__call__ = wrap_block_reference_call(
+-        BlockReference.__call__)
+-    Macro._invoke = wrap_macro_invoke(Macro._invoke)
+-
+-
+-def patch_filters():
+-    from jinja2.filters import FILTERS
+-    from jinja2.asyncfilters import ASYNC_FILTERS
+-    FILTERS.update(ASYNC_FILTERS)
+-
+-
+-def patch_all():
+-    patch_template()
+-    patch_runtime()
+-    patch_filters()
+-
+-
+-async def auto_await(value):
+-    if inspect.isawaitable(value):
+-        return await value
+-    return value
+-
+-
+-async def auto_aiter(iterable):
+-    if hasattr(iterable, '__aiter__'):
+-        async for item in iterable:
+-            yield item
+-        return
+-    for item in iterable:
+-        yield item
+-
+-
+-class AsyncLoopContext(LoopContextBase):
+-
+-    def __init__(self, async_iterator, undefined, after, length, recurse=None,
+-                 depth0=0):
+-        LoopContextBase.__init__(self, undefined, recurse, depth0)
+-        self._async_iterator = async_iterator
+-        self._after = after
+-        self._length = length
+-
+-    @property
+-    def length(self):
+-        if self._length is None:
+-            raise TypeError('Loop length for some iterators cannot be '
+-                            'lazily calculated in async mode')
+-        return self._length
+-
+-    def __aiter__(self):
+-        return AsyncLoopContextIterator(self)
+-
+-
+-class AsyncLoopContextIterator(object):
+-    __slots__ = ('context',)
+-
+-    def __init__(self, context):
+-        self.context = context
+-
+-    def __aiter__(self):
+-        return self
+-
+-    async def __anext__(self):
+-        ctx = self.context
+-        ctx.index0 += 1
+-        if ctx._after is _last_iteration:
+-            raise StopAsyncIteration()
+-        ctx._before = ctx._current
+-        ctx._current = ctx._after
+-        try:
+-            ctx._after = await ctx._async_iterator.__anext__()
+-        except StopAsyncIteration:
+-            ctx._after = _last_iteration
+-        return ctx._current, ctx
+-
+-
+-async def make_async_loop_context(iterable, undefined, recurse=None, depth0=0):
+-    # Length is more complicated and less efficient in async mode.  The
+-    # reason for this is that we cannot know if length will be used
+-    # upfront but because length is a property we cannot lazily execute it
+-    # later.  This means that we need to buffer it up and measure :(
+-    #
+-    # We however only do this for actual iterators, not for async
+-    # iterators as blocking here does not seem like the best idea in the
+-    # world.
+-    try:
+-        length = len(iterable)
+-    except (TypeError, AttributeError):
+-        if not hasattr(iterable, '__aiter__'):
+-            iterable = tuple(iterable)
+-            length = len(iterable)
+-        else:
+-            length = None
+-    async_iterator = auto_aiter(iterable)
+-    try:
+-        after = await async_iterator.__anext__()
+-    except StopAsyncIteration:
+-        after = _last_iteration
+-    return AsyncLoopContext(async_iterator, undefined, after, length, recurse,
+-                            depth0)
+diff -ruN Jinja2-2.10.1-orig/tests/test_async.py Jinja2-2.10.1/tests/test_async.py
+--- Jinja2-2.10.1-orig/tests/test_async.py	2019-03-19 22:49:57.000000000 +0300
++++ Jinja2-2.10.1/tests/test_async.py	1970-01-01 03:00:00.000000000 +0300
+@@ -1,512 +0,0 @@
+-import pytest
+-import asyncio
+-
+-from jinja2 import Template, Environment, DictLoader
+-from jinja2.exceptions import TemplateNotFound, TemplatesNotFound, \
+-     UndefinedError
+-
+-
+-def run(coro):
+-    loop = asyncio.get_event_loop()
+-    return loop.run_until_complete(coro)
+-
+-
+-def test_basic_async():
+-    t = Template('{% for item in [1, 2, 3] %}[{{ item }}]{% endfor %}',
+-                 enable_async=True)
+-    async def func():
+-        return await t.render_async()
+-
+-    rv = run(func())
+-    assert rv == '[1][2][3]'
+-
+-
+-def test_await_on_calls():
+-    t = Template('{{ async_func() + normal_func() }}',
+-                 enable_async=True)
+-
+-    async def async_func():
+-        return 42
+-
+-    def normal_func():
+-        return 23
+-
+-    async def func():
+-        return await t.render_async(
+-            async_func=async_func,
+-            normal_func=normal_func
+-        )
+-
+-    rv = run(func())
+-    assert rv == '65'
+-
+-
+-def test_await_on_calls_normal_render():
+-    t = Template('{{ async_func() + normal_func() }}',
+-                 enable_async=True)
+-
+-    async def async_func():
+-        return 42
+-
+-    def normal_func():
+-        return 23
+-
+-    rv = t.render(
+-        async_func=async_func,
+-        normal_func=normal_func
+-    )
+-
+-    assert rv == '65'
+-
+-
+-def test_await_and_macros():
+-    t = Template('{% macro foo(x) %}[{{ x }}][{{ async_func() }}]'
+-                 '{% endmacro %}{{ foo(42) }}', enable_async=True)
+-
+-    async def async_func():
+-        return 42
+-
+-    async def func():
+-        return await t.render_async(async_func=async_func)
+-
+-    rv = run(func())
+-    assert rv == '[42][42]'
+-
+-
+-def test_async_blocks():
+-    t = Template('{% block foo %}<Test>{% endblock %}{{ self.foo() }}',
+-                 enable_async=True, autoescape=True)
+-    async def func():
+-        return await t.render_async()
+-
+-    rv = run(func())
+-    assert rv == '<Test><Test>'
+-
+-
+-def test_async_generate():
+-    t = Template('{% for x in [1, 2, 3] %}{{ x }}{% endfor %}',
+-                 enable_async=True)
+-    rv = list(t.generate())
+-    assert rv == ['1', '2', '3']
+-
+-
+-def test_async_iteration_in_templates():
+-    t = Template('{% for x in rng %}{{ x }}{% endfor %}',
+-                 enable_async=True)
+-    async def async_iterator():
+-        for item in [1, 2, 3]:
+-            yield item
+-    rv = list(t.generate(rng=async_iterator()))
+-    assert rv == ['1', '2', '3']
+-
+-
+-def test_async_iteration_in_templates_extended():
+-    t = Template('{% for x in rng %}{{ loop.index0 }}/{{ x }}{% endfor %}',
+-                 enable_async=True)
+-    async def async_iterator():
+-        for item in [1, 2, 3]:
+-            yield item
+-    rv = list(t.generate(rng=async_iterator()))
+-    assert rv == ['0/1', '1/2', '2/3']
+-
+-
+-@pytest.fixture
+-def test_env_async():
+-    env = Environment(loader=DictLoader(dict(
+-        module='{% macro test() %}[{{ foo }}|{{ bar }}]{% endmacro %}',
+-        header='[{{ foo }}|{{ 23 }}]',
+-        o_printer='({{ o }})'
+-    )), enable_async=True)
+-    env.globals['bar'] = 23
+-    return env
+-
+-
+-@pytest.mark.imports
+-class TestAsyncImports(object):
+-
+-    def test_context_imports(self, test_env_async):
+-        t = test_env_async.from_string('{% import "module" as m %}{{ m.test() }}')
+-        assert t.render(foo=42) == '[|23]'
+-        t = test_env_async.from_string(
+-            '{% import "module" as m without context %}{{ m.test() }}'
+-        )
+-        assert t.render(foo=42) == '[|23]'
+-        t = test_env_async.from_string(
+-            '{% import "module" as m with context %}{{ m.test() }}'
+-        )
+-        assert t.render(foo=42) == '[42|23]'
+-        t = test_env_async.from_string('{% from "module" import test %}{{ test() }}')
+-        assert t.render(foo=42) == '[|23]'
+-        t = test_env_async.from_string(
+-            '{% from "module" import test without context %}{{ test() }}'
+-        )
+-        assert t.render(foo=42) == '[|23]'
+-        t = test_env_async.from_string(
+-            '{% from "module" import test with context %}{{ test() }}'
+-        )
+-        assert t.render(foo=42) == '[42|23]'
+-
+-    def test_trailing_comma(self, test_env_async):
+-        test_env_async.from_string('{% from "foo" import bar, baz with context %}')
+-        test_env_async.from_string('{% from "foo" import bar, baz, with context %}')
+-        test_env_async.from_string('{% from "foo" import bar, with context %}')
+-        test_env_async.from_string('{% from "foo" import bar, with, context %}')
+-        test_env_async.from_string('{% from "foo" import bar, with with context %}')
+-
+-    def test_exports(self, test_env_async):
+-        m = run(test_env_async.from_string('''
+-            {% macro toplevel() %}...{% endmacro %}
+-            {% macro __private() %}...{% endmacro %}
+-            {% set variable = 42 %}
+-            {% for item in [1] %}
+-                {% macro notthere() %}{% endmacro %}
+-            {% endfor %}
+-        ''')._get_default_module_async())
+-        assert run(m.toplevel()) == '...'
+-        assert not hasattr(m, '__missing')
+-        assert m.variable == 42
+-        assert not hasattr(m, 'notthere')
+-
+-
+-@pytest.mark.imports
+-@pytest.mark.includes
+-class TestAsyncIncludes(object):
+-
+-    def test_context_include(self, test_env_async):
+-        t = test_env_async.from_string('{% include "header" %}')
+-        assert t.render(foo=42) == '[42|23]'
+-        t = test_env_async.from_string('{% include "header" with context %}')
+-        assert t.render(foo=42) == '[42|23]'
+-        t = test_env_async.from_string('{% include "header" without context %}')
+-        assert t.render(foo=42) == '[|23]'
+-
+-    def test_choice_includes(self, test_env_async):
+-        t = test_env_async.from_string('{% include ["missing", "header"] %}')
+-        assert t.render(foo=42) == '[42|23]'
+-
+-        t = test_env_async.from_string(
+-            '{% include ["missing", "missing2"] ignore missing %}'
+-        )
+-        assert t.render(foo=42) == ''
+-
+-        t = test_env_async.from_string('{% include ["missing", "missing2"] %}')
+-        pytest.raises(TemplateNotFound, t.render)
+-        try:
+-            t.render()
+-        except TemplatesNotFound as e:
+-            assert e.templates == ['missing', 'missing2']
+-            assert e.name == 'missing2'
+-        else:
+-            assert False, 'thou shalt raise'
+-
+-        def test_includes(t, **ctx):
+-            ctx['foo'] = 42
+-            assert t.render(ctx) == '[42|23]'
+-
+-        t = test_env_async.from_string('{% include ["missing", "header"] %}')
+-        test_includes(t)
+-        t = test_env_async.from_string('{% include x %}')
+-        test_includes(t, x=['missing', 'header'])
+-        t = test_env_async.from_string('{% include [x, "header"] %}')
+-        test_includes(t, x='missing')
+-        t = test_env_async.from_string('{% include x %}')
+-        test_includes(t, x='header')
+-        t = test_env_async.from_string('{% include x %}')
+-        test_includes(t, x='header')
+-        t = test_env_async.from_string('{% include [x] %}')
+-        test_includes(t, x='header')
+-
+-    def test_include_ignoring_missing(self, test_env_async):
+-        t = test_env_async.from_string('{% include "missing" %}')
+-        pytest.raises(TemplateNotFound, t.render)
+-        for extra in '', 'with context', 'without context':
+-            t = test_env_async.from_string('{% include "missing" ignore missing ' +
+-                                     extra + ' %}')
+-            assert t.render() == ''
+-
+-    def test_context_include_with_overrides(self, test_env_async):
+-        env = Environment(loader=DictLoader(dict(
+-            main="{% for item in [1, 2, 3] %}{% include 'item' %}{% endfor %}",
+-            item="{{ item }}"
+-        )))
+-        assert env.get_template("main").render() == "123"
+-
+-    def test_unoptimized_scopes(self, test_env_async):
+-        t = test_env_async.from_string("""
+-            {% macro outer(o) %}
+-            {% macro inner() %}
+-            {% include "o_printer" %}
+-            {% endmacro %}
+-            {{ inner() }}
+-            {% endmacro %}
+-            {{ outer("FOO") }}
+-        """)
+-        assert t.render().strip() == '(FOO)'
+-
+-    def test_unoptimized_scopes_autoescape(self):
+-        env = Environment(loader=DictLoader(dict(
+-            o_printer='({{ o }})',
+-        )), autoescape=True, enable_async=True)
+-        t = env.from_string("""
+-            {% macro outer(o) %}
+-            {% macro inner() %}
+-            {% include "o_printer" %}
+-            {% endmacro %}
+-            {{ inner() }}
+-            {% endmacro %}
+-            {{ outer("FOO") }}
+-        """)
+-        assert t.render().strip() == '(FOO)'
+-
+-
+-@pytest.mark.core_tags
+-@pytest.mark.for_loop
+-class TestAsyncForLoop(object):
+-
+-    def test_simple(self, test_env_async):
+-        tmpl = test_env_async.from_string('{% for item in seq %}{{ item }}{% endfor %}')
+-        assert tmpl.render(seq=list(range(10))) == '0123456789'
+-
+-    def test_else(self, test_env_async):
+-        tmpl = test_env_async.from_string(
+-            '{% for item in seq %}XXX{% else %}...{% endfor %}')
+-        assert tmpl.render() == '...'
+-
+-    def test_empty_blocks(self, test_env_async):
+-        tmpl = test_env_async.from_string('<{% for item in seq %}{% else %}{% endfor %}>')
+-        assert tmpl.render() == '<>'
+-
+-    def test_context_vars(self, test_env_async):
+-        slist = [42, 24]
+-        for seq in [slist, iter(slist), reversed(slist), (_ for _ in slist)]:
+-            tmpl = test_env_async.from_string('''{% for item in seq -%}
+-            {{ loop.index }}|{{ loop.index0 }}|{{ loop.revindex }}|{{
+-                loop.revindex0 }}|{{ loop.first }}|{{ loop.last }}|{{
+-               loop.length }}###{% endfor %}''')
+-            one, two, _ = tmpl.render(seq=seq).split('###')
+-            (one_index, one_index0, one_revindex, one_revindex0, one_first,
+-             one_last, one_length) = one.split('|')
+-            (two_index, two_index0, two_revindex, two_revindex0, two_first,
+-             two_last, two_length) = two.split('|')
+-
+-            assert int(one_index) == 1 and int(two_index) == 2
+-            assert int(one_index0) == 0 and int(two_index0) == 1
+-            assert int(one_revindex) == 2 and int(two_revindex) == 1
+-            assert int(one_revindex0) == 1 and int(two_revindex0) == 0
+-            assert one_first == 'True' and two_first == 'False'
+-            assert one_last == 'False' and two_last == 'True'
+-            assert one_length == two_length == '2'
+-
+-    def test_cycling(self, test_env_async):
+-        tmpl = test_env_async.from_string('''{% for item in seq %}{{
+-            loop.cycle('<1>', '<2>') }}{% endfor %}{%
+-            for item in seq %}{{ loop.cycle(*through) }}{% endfor %}''')
+-        output = tmpl.render(seq=list(range(4)), through=('<1>', '<2>'))
+-        assert output == '<1><2>' * 4
+-
+-    def test_lookaround(self, test_env_async):
+-        tmpl = test_env_async.from_string('''{% for item in seq -%}
+-            {{ loop.previtem|default('x') }}-{{ item }}-{{
+-            loop.nextitem|default('x') }}|
+-        {%- endfor %}''')
+-        output = tmpl.render(seq=list(range(4)))
+-        assert output == 'x-0-1|0-1-2|1-2-3|2-3-x|'
+-
+-    def test_changed(self, test_env_async):
+-        tmpl = test_env_async.from_string('''{% for item in seq -%}
+-            {{ loop.changed(item) }},
+-        {%- endfor %}''')
+-        output = tmpl.render(seq=[None, None, 1, 2, 2, 3, 4, 4, 4])
+-        assert output == 'True,False,True,True,False,True,True,False,False,'
+-
+-    def test_scope(self, test_env_async):
+-        tmpl = test_env_async.from_string('{% for item in seq %}{% endfor %}{{ item }}')
+-        output = tmpl.render(seq=list(range(10)))
+-        assert not output
+-
+-    def test_varlen(self, test_env_async):
+-        def inner():
+-            for item in range(5):
+-                yield item
+-        tmpl = test_env_async.from_string('{% for item in iter %}{{ item }}{% endfor %}')
+-        output = tmpl.render(iter=inner())
+-        assert output == '01234'
+-
+-    def test_noniter(self, test_env_async):
+-        tmpl = test_env_async.from_string('{% for item in none %}...{% endfor %}')
+-        pytest.raises(TypeError, tmpl.render)
+-
+-    def test_recursive(self, test_env_async):
+-        tmpl = test_env_async.from_string('''{% for item in seq recursive -%}
+-            [{{ item.a }}{% if item.b %}<{{ loop(item.b) }}>{% endif %}]
+-        {%- endfor %}''')
+-        assert tmpl.render(seq=[
+-            dict(a=1, b=[dict(a=1), dict(a=2)]),
+-            dict(a=2, b=[dict(a=1), dict(a=2)]),
+-            dict(a=3, b=[dict(a='a')])
+-        ]) == '[1<[1][2]>][2<[1][2]>][3<[a]>]'
+-
+-    def test_recursive_lookaround(self, test_env_async):
+-        tmpl = test_env_async.from_string('''{% for item in seq recursive -%}
+-            [{{ loop.previtem.a if loop.previtem is defined else 'x' }}.{{
+-            item.a }}.{{ loop.nextitem.a if loop.nextitem is defined else 'x'
+-            }}{% if item.b %}<{{ loop(item.b) }}>{% endif %}]
+-        {%- endfor %}''')
+-        assert tmpl.render(seq=[
+-            dict(a=1, b=[dict(a=1), dict(a=2)]),
+-            dict(a=2, b=[dict(a=1), dict(a=2)]),
+-            dict(a=3, b=[dict(a='a')])
+-        ]) == '[x.1.2<[x.1.2][1.2.x]>][1.2.3<[x.1.2][1.2.x]>][2.3.x<[x.a.x]>]'
+-
+-    def test_recursive_depth0(self, test_env_async):
+-        tmpl = test_env_async.from_string('''{% for item in seq recursive -%}
+-            [{{ loop.depth0 }}:{{ item.a }}{% if item.b %}<{{ loop(item.b) }}>{% endif %}]
+-        {%- endfor %}''')
+-        assert tmpl.render(seq=[
+-            dict(a=1, b=[dict(a=1), dict(a=2)]),
+-            dict(a=2, b=[dict(a=1), dict(a=2)]),
+-            dict(a=3, b=[dict(a='a')])
+-        ]) == '[0:1<[1:1][1:2]>][0:2<[1:1][1:2]>][0:3<[1:a]>]'
+-
+-    def test_recursive_depth(self, test_env_async):
+-        tmpl = test_env_async.from_string('''{% for item in seq recursive -%}
+-            [{{ loop.depth }}:{{ item.a }}{% if item.b %}<{{ loop(item.b) }}>{% endif %}]
+-        {%- endfor %}''')
+-        assert tmpl.render(seq=[
+-            dict(a=1, b=[dict(a=1), dict(a=2)]),
+-            dict(a=2, b=[dict(a=1), dict(a=2)]),
+-            dict(a=3, b=[dict(a='a')])
+-        ]) == '[1:1<[2:1][2:2]>][1:2<[2:1][2:2]>][1:3<[2:a]>]'
+-
+-    def test_looploop(self, test_env_async):
+-        tmpl = test_env_async.from_string('''{% for row in table %}
+-            {%- set rowloop = loop -%}
+-            {% for cell in row -%}
+-                [{{ rowloop.index }}|{{ loop.index }}]
+-            {%- endfor %}
+-        {%- endfor %}''')
+-        assert tmpl.render(table=['ab', 'cd']) == '[1|1][1|2][2|1][2|2]'
+-
+-    def test_reversed_bug(self, test_env_async):
+-        tmpl = test_env_async.from_string('{% for i in items %}{{ i }}'
+-                               '{% if not loop.last %}'
+-                               ',{% endif %}{% endfor %}')
+-        assert tmpl.render(items=reversed([3, 2, 1])) == '1,2,3'
+-
+-    def test_loop_errors(self, test_env_async):
+-        tmpl = test_env_async.from_string('''{% for item in [1] if loop.index
+-                                      == 0 %}...{% endfor %}''')
+-        pytest.raises(UndefinedError, tmpl.render)
+-        tmpl = test_env_async.from_string('''{% for item in [] %}...{% else
+-            %}{{ loop }}{% endfor %}''')
+-        assert tmpl.render() == ''
+-
+-    def test_loop_filter(self, test_env_async):
+-        tmpl = test_env_async.from_string('{% for item in range(10) if item '
+-                               'is even %}[{{ item }}]{% endfor %}')
+-        assert tmpl.render() == '[0][2][4][6][8]'
+-        tmpl = test_env_async.from_string('''
+-            {%- for item in range(10) if item is even %}[{{
+-                loop.index }}:{{ item }}]{% endfor %}''')
+-        assert tmpl.render() == '[1:0][2:2][3:4][4:6][5:8]'
+-
+-    def test_scoped_special_var(self, test_env_async):
+-        t = test_env_async.from_string(
+-            '{% for s in seq %}[{{ loop.first }}{% for c in s %}'
+-            '|{{ loop.first }}{% endfor %}]{% endfor %}')
+-        assert t.render(seq=('ab', 'cd')) \
+-            == '[True|True|False][False|True|False]'
+-
+-    def test_scoped_loop_var(self, test_env_async):
+-        t = test_env_async.from_string('{% for x in seq %}{{ loop.first }}'
+-                            '{% for y in seq %}{% endfor %}{% endfor %}')
+-        assert t.render(seq='ab') == 'TrueFalse'
+-        t = test_env_async.from_string('{% for x in seq %}{% for y in seq %}'
+-                            '{{ loop.first }}{% endfor %}{% endfor %}')
+-        assert t.render(seq='ab') == 'TrueFalseTrueFalse'
+-
+-    def test_recursive_empty_loop_iter(self, test_env_async):
+-        t = test_env_async.from_string('''
+-        {%- for item in foo recursive -%}{%- endfor -%}
+-        ''')
+-        assert t.render(dict(foo=[])) == ''
+-
+-    def test_call_in_loop(self, test_env_async):
+-        t = test_env_async.from_string('''
+-        {%- macro do_something() -%}
+-            [{{ caller() }}]
+-        {%- endmacro %}
+-
+-        {%- for i in [1, 2, 3] %}
+-            {%- call do_something() -%}
+-                {{ i }}
+-            {%- endcall %}
+-        {%- endfor -%}
+-        ''')
+-        assert t.render() == '[1][2][3]'
+-
+-    def test_scoping_bug(self, test_env_async):
+-        t = test_env_async.from_string('''
+-        {%- for item in foo %}...{{ item }}...{% endfor %}
+-        {%- macro item(a) %}...{{ a }}...{% endmacro %}
+-        {{- item(2) -}}
+-        ''')
+-        assert t.render(foo=(1,)) == '...1......2...'
+-
+-    def test_unpacking(self, test_env_async):
+-        tmpl = test_env_async.from_string('{% for a, b, c in [[1, 2, 3]] %}'
+-                               '{{ a }}|{{ b }}|{{ c }}{% endfor %}')
+-        assert tmpl.render() == '1|2|3'
+-
+-    def test_recursive_loop_filter(self, test_env_async):
+-        t = test_env_async.from_string('''
+-        <?xml version="1.0" encoding="UTF-8"?>
+-        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+-          {%- for page in [site.root] if page.url != this recursive %}
+-          <url><loc>{{ page.url }}</loc></url>
+-          {{- loop(page.children) }}
+-          {%- endfor %}
+-        </urlset>
+-        ''')
+-        sm  =t.render(this='/foo', site={'root': {
+-            'url': '/',
+-            'children': [
+-                {'url': '/foo'},
+-                {'url': '/bar'},
+-            ]
+-        }})
+-        lines = [x.strip() for x in sm.splitlines() if x.strip()]
+-        assert lines == [
+-            '<?xml version="1.0" encoding="UTF-8"?>',
+-            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+-            '<url><loc>/</loc></url>',
+-            '<url><loc>/bar</loc></url>',
+-            '</urlset>',
+-        ]
+-
+-    def test_nonrecursive_loop_filter(self, test_env_async):
+-        t = test_env_async.from_string('''
+-        <?xml version="1.0" encoding="UTF-8"?>
+-        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+-          {%- for page in items if page.url != this %}
+-          <url><loc>{{ page.url }}</loc></url>
+-          {%- endfor %}
+-        </urlset>
+-        ''')
+-        sm  =t.render(this='/foo', items=[
+-            {'url': '/'},
+-            {'url': '/foo'},
+-            {'url': '/bar'},
+-        ])
+-        lines = [x.strip() for x in sm.splitlines() if x.strip()]
+-        assert lines == [
+-            '<?xml version="1.0" encoding="UTF-8"?>',
+-            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+-            '<url><loc>/</loc></url>',
+-            '<url><loc>/bar</loc></url>',
+-            '</urlset>',
+-        ]
+-
+-    def test_bare_async(self, test_env_async):
+-        t = test_env_async.from_string('{% extends "header" %}')
+-        assert t.render(foo=42) == '[42|23]'
+diff -ruN Jinja2-2.10.1-orig/tests/test_asyncfilters.py Jinja2-2.10.1/tests/test_asyncfilters.py
+--- Jinja2-2.10.1-orig/tests/test_asyncfilters.py	2019-04-06 20:10:11.000000000 +0300
++++ Jinja2-2.10.1/tests/test_asyncfilters.py	1970-01-01 03:00:00.000000000 +0300
+@@ -1,227 +0,0 @@
+-import pytest
+-from jinja2 import Environment
+-from jinja2.utils import Markup
+-
+-
+-async def make_aiter(iter):
+-    for item in iter:
+-        yield item
+-
+-
+-def mark_dualiter(parameter, factory):
+-    def decorator(f):
+-        return pytest.mark.parametrize(parameter, [
+-            lambda: factory(),
+-            lambda: make_aiter(factory()),
+-        ])(f)
+-    return decorator
+-
+-
+-@pytest.fixture
+-def env_async():
+-    return Environment(enable_async=True)
+-
+-
+-@mark_dualiter('foo', lambda: range(10))
+-def test_first(env_async, foo):
+-    tmpl = env_async.from_string('{{ foo()|first }}')
+-    out = tmpl.render(foo=foo)
+-    assert out == '0'
+-
+-
+-@mark_dualiter('items', lambda: [
+-    {'foo': 1, 'bar': 2},
+-    {'foo': 2, 'bar': 3},
+-    {'foo': 1, 'bar': 1},
+-    {'foo': 3, 'bar': 4}
+-])
+-def test_groupby(env_async, items):
+-    tmpl = env_async.from_string('''
+-    {%- for grouper, list in items()|groupby('foo') -%}
+-        {{ grouper }}{% for x in list %}: {{ x.foo }}, {{ x.bar }}{% endfor %}|
+-    {%- endfor %}''')
+-    assert tmpl.render(items=items).split('|') == [
+-        "1: 1, 2: 1, 1",
+-        "2: 2, 3",
+-        "3: 3, 4",
+-        ""
+-    ]
+-
+-
+-@mark_dualiter('items', lambda: [('a', 1), ('a', 2), ('b', 1)])
+-def test_groupby_tuple_index(env_async, items):
+-    tmpl = env_async.from_string('''
+-    {%- for grouper, list in items()|groupby(0) -%}
+-        {{ grouper }}{% for x in list %}:{{ x.1 }}{% endfor %}|
+-    {%- endfor %}''')
+-    assert tmpl.render(items=items) == 'a:1:2|b:1|'
+-
+-
+-def make_articles():
+-    class Date(object):
+-        def __init__(self, day, month, year):
+-            self.day = day
+-            self.month = month
+-            self.year = year
+-
+-    class Article(object):
+-        def __init__(self, title, *date):
+-            self.date = Date(*date)
+-            self.title = title
+-
+-    return [
+-        Article('aha', 1, 1, 1970),
+-        Article('interesting', 2, 1, 1970),
+-        Article('really?', 3, 1, 1970),
+-        Article('totally not', 1, 1, 1971)
+-    ]
+-
+-
+-@mark_dualiter('articles', make_articles)
+-def test_groupby_multidot(env_async, articles):
+-    tmpl = env_async.from_string('''
+-    {%- for year, list in articles()|groupby('date.year') -%}
+-        {{ year }}{% for x in list %}[{{ x.title }}]{% endfor %}|
+-    {%- endfor %}''')
+-    assert tmpl.render(articles=articles).split('|') == [
+-        '1970[aha][interesting][really?]',
+-        '1971[totally not]',
+-        ''
+-    ]
+-
+-
+-@mark_dualiter('int_items', lambda: [1, 2, 3])
+-def test_join(env_async, int_items):
+-    tmpl = env_async.from_string('{{ items()|join("|") }}')
+-    out = tmpl.render(items=int_items)
+-    assert out == '1|2|3'
+-
+-
+-@mark_dualiter('string_items', lambda: ["<foo>", Markup("<span>foo</span>")])
+-def test_join(string_items):
+-    env2 = Environment(autoescape=True, enable_async=True)
+-    tmpl = env2.from_string(
+-        '{{ ["<foo>", "<span>foo</span>"|safe]|join }}')
+-    assert tmpl.render(items=string_items) == '&lt;foo&gt;<span>foo</span>'
+-
+-
+-def make_users():
+-    class User(object):
+-        def __init__(self, username):
+-            self.username = username
+-    return map(User, ['foo', 'bar'])
+-
+-
+-@mark_dualiter('users', make_users)
+-def test_join_attribute(env_async, users):
+-    tmpl = env_async.from_string('''{{ users()|join(', ', 'username') }}''')
+-    assert tmpl.render(users=users) == 'foo, bar'
+-
+-
+-@mark_dualiter('items', lambda: [1, 2, 3, 4, 5])
+-def test_simple_reject(env_async, items):
+-    tmpl = env_async.from_string('{{ items()|reject("odd")|join("|") }}')
+-    assert tmpl.render(items=items) == '2|4'
+-
+-
+-@mark_dualiter('items', lambda: [None, False, 0, 1, 2, 3, 4, 5])
+-def test_bool_reject(env_async, items):
+-    tmpl = env_async.from_string(
+-        '{{ items()|reject|join("|") }}'
+-    )
+-    assert tmpl.render(items=items) == 'None|False|0'
+-
+-
+-@mark_dualiter('items', lambda: [1, 2, 3, 4, 5])
+-def test_simple_select(env_async, items):
+-    tmpl = env_async.from_string('{{ items()|select("odd")|join("|") }}')
+-    assert tmpl.render(items=items) == '1|3|5'
+-
+-
+-@mark_dualiter('items', lambda: [None, False, 0, 1, 2, 3, 4, 5])
+-def test_bool_select(env_async, items):
+-    tmpl = env_async.from_string(
+-        '{{ items()|select|join("|") }}'
+-    )
+-    assert tmpl.render(items=items) == '1|2|3|4|5'
+-
+-
+-def make_users():
+-    class User(object):
+-        def __init__(self, name, is_active):
+-            self.name = name
+-            self.is_active = is_active
+-    return [
+-        User('john', True),
+-        User('jane', True),
+-        User('mike', False),
+-    ]
+-
+-
+-@mark_dualiter('users', make_users)
+-def test_simple_select_attr(env_async, users):
+-    tmpl = env_async.from_string(
+-        '{{ users()|selectattr("is_active")|'
+-        'map(attribute="name")|join("|") }}'
+-    )
+-    assert tmpl.render(users=users) == 'john|jane'
+-
+-
+-@mark_dualiter('items', lambda: list('123'))
+-def test_simple_map(env_async, items):
+-    tmpl = env_async.from_string('{{ items()|map("int")|sum }}')
+-    assert tmpl.render(items=items) == '6'
+-
+-
+-@mark_dualiter('users', make_users)
+-def test_attribute_map(env_async, users):
+-    tmpl = env_async.from_string('{{ users()|map(attribute="name")|join("|") }}')
+-    assert tmpl.render(users=users) == 'john|jane|mike'
+-
+-
+-def test_empty_map(env_async):
+-    tmpl = env_async.from_string('{{ none|map("upper")|list }}')
+-    assert tmpl.render() == '[]'
+-
+-
+-@mark_dualiter('items', lambda: [1, 2, 3, 4, 5, 6])
+-def test_sum(env_async, items):
+-    tmpl = env_async.from_string('''{{ items()|sum }}''')
+-    assert tmpl.render(items=items) == '21'
+-
+-
+-@mark_dualiter('items', lambda: [
+-    {'value': 23},
+-    {'value': 1},
+-    {'value': 18},
+-])
+-def test_sum_attributes(env_async, items):
+-    tmpl = env_async.from_string('''{{ items()|sum('value') }}''')
+-    assert tmpl.render(items=items)
+-
+-
+-def test_sum_attributes_nested(env_async):
+-    tmpl = env_async.from_string('''{{ values|sum('real.value') }}''')
+-    assert tmpl.render(values=[
+-        {'real': {'value': 23}},
+-        {'real': {'value': 1}},
+-        {'real': {'value': 18}},
+-    ]) == '42'
+-
+-
+-def test_sum_attributes_tuple(env_async):
+-    tmpl = env_async.from_string('''{{ values.items()|sum('1') }}''')
+-    assert tmpl.render(values={
+-        'foo': 23,
+-        'bar': 1,
+-        'baz': 18,
+-    }) == '42'
+-
+-
+-@mark_dualiter('items', lambda: range(10))
+-def test_slice(env_async, items):
+-    tmpl = env_async.from_string('{{ items()|slice(3)|list }}|'
+-                                 '{{ items()|slice(3, "X")|list }}')
+-    out = tmpl.render(items=items)
+-    assert out == ("[[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]|"
+-                   "[[0, 1, 2, 3], [4, 5, 6, 'X'], [7, 8, 9, 'X']]")

@@ -1,0 +1,45 @@
+diff -ruN cffi-1.12.2/setup.py cffi-1.12.2-fixes/setup.py
+--- cffi-1.12.2/setup.py	2019-02-26 18:01:22.000000000 +0300
++++ cffi-1.12.2-fixes/setup.py	2020-04-14 00:42:13.000000000 +0300
+@@ -105,8 +105,8 @@
+     return config.try_compile('#ifndef _MSC_VER\n#error "not MSVC"\n#endif')
+ 
+ def use_pkg_config():
+-    if sys.platform == 'darwin' and os.path.exists('/usr/local/bin/brew'):
+-        use_homebrew_for_libffi()
++    # if sys.platform == 'darwin' and os.path.exists('/usr/local/bin/brew'):
++    #     use_homebrew_for_libffi()
+ 
+     _ask_pkg_config(include_dirs,       '--cflags-only-I', '-I', sysroot=True)
+     _ask_pkg_config(extra_compile_args, '--cflags-only-other')
+@@ -153,18 +153,18 @@
+     include_dirs.append('/usr/local/include')
+     library_dirs.append('/usr/local/lib')
+ 
+-if 'darwin' in sys.platform:
+-    try:
+-        p = subprocess.Popen(['xcrun', '--show-sdk-path'],
+-                             stdout=subprocess.PIPE)
+-    except OSError as e:
+-        if e.errno not in [errno.ENOENT, errno.EACCES]:
+-            raise
+-    else:
+-        t = p.stdout.read().decode().strip()
+-        p.stdout.close()
+-        if p.wait() == 0:
+-            include_dirs.append(t + '/usr/include/ffi')
++# if 'darwin' in sys.platform:
++#     try:
++#         p = subprocess.Popen(['xcrun', '--show-sdk-path'],
++#                              stdout=subprocess.PIPE)
++#     except OSError as e:
++#         if e.errno not in [errno.ENOENT, errno.EACCES]:
++#             raise
++#     else:
++#         t = p.stdout.read().decode().strip()
++#         p.stdout.close()
++#         if p.wait() == 0:
++#             include_dirs.append(t + '/usr/include/ffi')
+ 
+ 
+ 

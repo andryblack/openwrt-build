@@ -9,5 +9,6 @@ www-data:x:33:
 ftp:x:55:
 users:x:100:
 network:x:101:
+services:x:200:
 nogroup:x:65534:
 

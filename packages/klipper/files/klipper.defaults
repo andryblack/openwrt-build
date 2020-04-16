@@ -1,0 +1,8 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+group_add_user dialout klipper
+chown klipper:klipper /etc/printer.cfg
+
+exit 0
