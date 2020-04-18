@@ -8,7 +8,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=pcb-printer-host
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/andryblack/pcb-printer-host.git
@@ -26,7 +26,7 @@ define Package/pcb-printer-host
   TITLE:=PCB printing server
   URL:=https://github.com/andryblack/pcb-printer-host
   DEPENDS:=+libuv +yajl +libopenssl +librt +libstdcpp +rpi-userland +libpng +kmod-video-uvc
-  USERID:=services:printhost
+  USERID:=printhost:services
 endef
 
 define Package/pcb-printer-host/description

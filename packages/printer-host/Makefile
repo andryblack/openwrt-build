@@ -8,7 +8,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=printer-host
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/andryblack/printer-host.git
@@ -26,7 +26,7 @@ define Package/printer-host
   TITLE:=3D printing server
   URL:=https://github.com/andryblack/printer-host
   DEPENDS:=+libuv +yajl +libopenssl +librt +libstdcpp
-  USERID:=services:printhost
+  USERID:=printhost:services
 endef
 
 define Package/printer-host/description

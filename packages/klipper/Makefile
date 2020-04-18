@@ -8,7 +8,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=klipper
 PKG_VERSION:=0.8.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/KevinOConnor/klipper.git
@@ -29,7 +29,7 @@ define Package/klipper
 	URL:=https://www.klipper3d.org/
 	DEPENDS:=+python-light +python-pyserial +python-cffi-klipper +python-jinja2-klipper +python-greenlet-klipper \
 		+python-logging +python-codecs
-	USERID:=services:klipper
+	USERID:=klipper:services
 	VARIANT:=python
 endef
 
