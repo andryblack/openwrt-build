@@ -1,0 +1,9 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+group_exists video || group_add video 30
+group_exists gpio || group_add gpio 31
+group_exists services || group_add gpio 200
+
+exit 0

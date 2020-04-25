@@ -40,6 +40,7 @@ define Package/rpi-zero-prepare/install
 	$(INSTALL_BIN) ./files/up-wifi.defaults $(1)/etc/uci-defaults/90-up-wifi
 	$(INSTALL_BIN) ./files/serial-clean.defaults $(1)/etc/uci-defaults/90-serial-clean
 	$(INSTALL_BIN) ./files/data-partitions.defaults $(1)/etc/uci-defaults/91-data-partitions
+	$(INSTALL_BIN) ./files/groups-add.defaults $(1)/etc/uci-defaults/10-groups-add
 	##sed '/^DATA_PARTITION_OFFSET /s/=.*$/= $(DATA_PARTITION_OFFSET)/' $(1)/etc/uci-defaults/91-data-partitions
 	$(INSTALL_DIR) $(1)/etc/modules.d
 endef

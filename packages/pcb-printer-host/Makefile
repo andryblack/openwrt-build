@@ -16,7 +16,7 @@ PKG_SOURCE_VERSION:=37eb03a22d23fac5b865ee524b7b4279cbf790da
 PKG_BUILD_DIR:=$(BUILD_DIR)/pcb-printer-host-$(PKG_VERSION)
 
 #HOST_BUILD_DEPENDS:=premake/host
-PKG_BUILD_DEPENDS:=premake5/host lua53static
+PKG_BUILD_DEPENDS:=premake5/host lua53static rpi-zero-prepare
 
 include $(INCLUDE_DIR)/package.mk
 

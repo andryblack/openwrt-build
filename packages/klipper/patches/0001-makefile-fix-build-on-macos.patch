@@ -1,0 +1,62 @@
+From c18c84417a822615f32680c497dd25cbda8c8d58 Mon Sep 17 00:00:00 2001
+From: andryblack <blackicebox@gmail.com>
+Date: Mon, 13 Apr 2020 01:27:27 +0300
+Subject: [PATCH 1/3] makefile: fix build on macos
+
+Replace missed host tools on macos.
+
+Signed-off-by: andryblack <blackicebox@gmail.com>
+---
+ Makefile             | 11 ++++++++++-
+ scripts/check-gcc.sh |  4 ++--
+ 2 files changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index e38a7eb6..2ca9a9f5 100644
+--- a/Makefile
++++ b/Makefile
+@@ -22,8 +22,17 @@ OBJCOPY=$(CROSS_PREFIX)objcopy
+ OBJDUMP=$(CROSS_PREFIX)objdump
+ STRIP=$(CROSS_PREFIX)strip
+ CPP=cpp
++READELF=readelf
+ PYTHON=python2
+ 
++OS_NAME := $(shell uname -s | tr A-Z a-z)
++
++ifeq ($(OS_NAME),darwin)
++	CPP=clang -E
++	READELF=$(CROSS_PREFIX)readelf
++endif
++
++
+ # Source files
+ src-y =
+ dirs-y = src
+@@ -94,7 +103,7 @@ $(OUT)compile_time_request.o: $(patsubst %.c, $(OUT)src/%.o.ctr,$(src-y)) ./scri
+ $(OUT)klipper.elf: $(OBJS_klipper.elf)
+ 	@echo "  Linking $@"
+ 	$(Q)$(CC) $(OBJS_klipper.elf) $(CFLAGS_klipper.elf) -o $@
+-	$(Q)scripts/check-gcc.sh $@ $(OUT)compile_time_request.o
++	$(Q)READELF=$(READELF) scripts/check-gcc.sh $@ $(OUT)compile_time_request.o
+ 
+ ################ Kconfig rules
+ 
+diff --git a/scripts/check-gcc.sh b/scripts/check-gcc.sh
+index 2d89d98f..7185fcbb 100755
+--- a/scripts/check-gcc.sh
++++ b/scripts/check-gcc.sh
+@@ -4,8 +4,8 @@
+ f1="$1"
+ f2="$2"
+ 
+-s1=`readelf -A "$f1" | grep "Tag_ARM_ISA_use"`
+-s2=`readelf -A "$f2" | grep "Tag_ARM_ISA_use"`
++s1=`$READELF -A "$f1" | grep "Tag_ARM_ISA_use"`
++s2=`$READELF -A "$f2" | grep "Tag_ARM_ISA_use"`
+ 
+ if [ "$s1" != "$s2" ]; then
+     echo ""
+-- 
+2.24.2 (Apple Git-127)
+

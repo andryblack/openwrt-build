@@ -1,0 +1,8 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+group_add_user dialout klipper
+group_add_user gpio klipper
+
+exit 0
