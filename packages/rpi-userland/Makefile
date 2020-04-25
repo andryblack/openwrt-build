@@ -24,7 +24,7 @@ define Package/rpi-userland
   CATEGORY:=Applications
   TITLE:=Raspberry Pi useraland
   URL:=https://github.com/raspberrypi/userland
-  DEPENDS:=
+  DEPENDS:=+rpi-zero-prepare
 endef
 
 define Package/rpi-userland/description

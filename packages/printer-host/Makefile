@@ -25,7 +25,7 @@ define Package/printer-host
   CATEGORY:=Applications
   TITLE:=3D printing server
   URL:=https://github.com/andryblack/printer-host
-  DEPENDS:=+libuv +yajl +libopenssl +librt +libstdcpp
+  DEPENDS:=+libuv +yajl +libopenssl +librt +libstdcpp +rpi-zero-prepare
   USERID:=printhost:services
 endef
 

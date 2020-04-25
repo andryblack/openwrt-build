@@ -28,7 +28,7 @@ define Package/klipper
 	TITLE:=3D printing firmware host
 	URL:=https://www.klipper3d.org/
 	DEPENDS:=+python-light +python-pyserial +python-cffi-klipper +python-jinja2-klipper +python-greenlet-klipper \
-		+python-logging +python-codecs
+		+python-logging +python-codecs +rpi-zero-prepare
 	USERID:=klipper:services
 	VARIANT:=python
 endef
@@ -38,7 +38,7 @@ define Package/klipper-mcu
 	CATEGORY:=Applications
 	TITLE:=3D printing firmware mcu
 	URL:=https://www.klipper3d.org/
-	DEPENDS:=+libgpiod14
+	DEPENDS:=+libgpiod14 +rpi-zero-prepare
 	USERID:=klipper:services
 endef
 
