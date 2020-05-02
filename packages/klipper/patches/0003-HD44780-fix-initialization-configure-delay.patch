@@ -1,7 +1,7 @@
 From befb18147eb483a2b6744d7945bdc5daac22c698 Mon Sep 17 00:00:00 2001
 From: andryblack <blackicebox@gmail.com>
 Date: Sun, 26 Apr 2020 19:13:25 +0300
-Subject: [PATCH 3/3] HD44780: fix initialization, configure delay
+Subject: [PATCH 3/4] HD44780: fix initialization, configure delay
 
 Correct initialization sequence, allow fine-tune commands delay.
 

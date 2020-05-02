@@ -1,7 +1,7 @@
 From f413a3a9f3d81da1b93c4e19f0f18d5ad26efb9a Mon Sep 17 00:00:00 2001
 From: andryblack <blackicebox@gmail.com>
 Date: Fri, 24 Apr 2020 00:16:31 +0300
-Subject: [PATCH 2/3] linux: userspace GPIO control via libgpiod
+Subject: [PATCH 2/4] linux: userspace GPIO control via libgpiod
 
 Allow use host GPIO pins for non-realtime purposes.
 
