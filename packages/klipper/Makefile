@@ -8,11 +8,11 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=klipper
 PKG_VERSION:=0.8.0
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/KevinOConnor/klipper.git
-PKG_SOURCE_VERSION:=03fb7961b444013c2dc5ec5de40d9901f4c3eb57
+PKG_SOURCE_VERSION:=07e8011f51667c2b61676b2c77a510569cbf1ec6
 PKG_BUILD_DIR:=$(BUILD_DIR)/klipper-$(PKG_VERSION)
 
 HOST_PYTHON_PACKAGE_BUILD_DEPENDS:="cffi==1.12.2"
@@ -58,7 +58,9 @@ endef
 
 define Build/Compile
 	
-	cd $(PKG_BUILD_DIR) && $(MAKE) CROSS_PREFIX=$(TARGET_CROSS) V=1
+	cd $(PKG_BUILD_DIR) && $(MAKE) CROSS_PREFIX=$(TARGET_CROSS) \
+		LDFLAGS="$(TARGET_LDFLAGS)" \
+		CFLAGS="$(TARGET_CFLAGS) -iquote out/ -iquote src -iquote out/board-generic/ -std=gnu11"  V=1
 	
 	$(MAKE) -C $(PKG_BUILD_DIR)/klippy/chelper -f $(PKG_BUILD_DIR)/build/build.mk OBJDIR=$(PKG_BUILD_DIR)/build \
 		CC="$(TARGET_CROSS)gcc" \

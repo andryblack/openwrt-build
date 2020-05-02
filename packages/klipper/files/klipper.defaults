@@ -3,6 +3,6 @@
 . /lib/functions.sh
 
 group_add_user dialout klipper
-chown klipper:klipper /etc/printer.cfg
+chown klipper:services /etc/printer.cfg
 
 exit 0

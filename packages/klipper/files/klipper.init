@@ -10,7 +10,7 @@ boot() {
     if [ -f /boot/printer.cfg ]; then
         mv /boot/printer.cfg /etc/printer.cfg
     fi
-    chown klipper:klipper /etc/printer.cfg
+    chown klipper:services /etc/printer.cfg
     start "$@"
     exit 0
 }

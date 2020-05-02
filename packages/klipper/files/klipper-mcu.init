@@ -1,9 +1,27 @@
 #!/bin/sh /etc/rc.common
 # Copyright (C) 2009-2014 OpenWrt.org
 
-START=90
+START=80
 STOP=10
 USE_PROCD=1
+
+boot() {
+    echo 0 > /sys/class/pwm/pwmchip0/export
+    chown root:gpio /sys/class/pwm/pwmchip0
+    chown root:gpio /sys/class/pwm/pwmchip0/pwm0
+    chmod 755 /sys/class/pwm
+    chmod 770 /sys/class/pwm/pwmchip0
+    chmod 770 /sys/class/pwm/pwmchip0/pwm0
+    chown root:gpio /sys/class/pwm/pwmchip0/pwm0/period
+    chmod 660 /sys/class/pwm/pwmchip0/pwm0/period
+    chown root:gpio /sys/class/pwm/pwmchip0/pwm0/duty_cycle
+    chmod 660 /sys/class/pwm/pwmchip0/pwm0/duty_cycle
+    chown root:gpio /sys/class/pwm/pwmchip0/pwm0/enable
+    chmod 660 /sys/class/pwm/pwmchip0/pwm0/enable
+    
+    start "$@"
+    exit 0
+}
 
 start_service() {
     procd_open_instance
