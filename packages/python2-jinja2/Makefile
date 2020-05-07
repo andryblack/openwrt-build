@@ -4,7 +4,7 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=python-jinja2-klipper
+PKG_NAME:=python2-jinja2
 PKG_VERSION:=2.10.1
 PKG_RELEASE:=1
 
@@ -22,26 +22,25 @@ PKG_CPE_ID:=cpe:/a:pocoo:jinja2
 HOST_PYTHON_PACKAGE_BUILD_DEPENDS:="MarkupSafe==1.1.1"
 
 include $(INCLUDE_DIR)/package.mk
-include $(INCLUDE_DIR)/../feeds/packages/lang/python/python-package.mk
+include ../python-package.mk
 
 PKG_UNPACK:=$(HOST_TAR) -C $(PKG_BUILD_DIR) --strip-components=1 -xzf $(DL_DIR)/$(PKG_SOURCE)
 
-define Package/python-jinja2-klipper
+define Package/python2-jinja2
   SECTION:=lang
   CATEGORY:=Languages
   SUBMENU:=Python
   TITLE:=Jinja2
   URL:=http://jinja.pocoo.org/
-  DEPENDS:=+python +python-markup-safe-klipper +python-decimal
+  DEPENDS:=+python2 +python2-markup-safe +python2-decimal
   VARIANT:=python
 endef
 
-define Package/python-jinja2-klipper/description
+define Package/python2-jinja2/description
 Jinja2 is a full featured template engine for Python. It has full
 unicode support, an optional integrated sandboxed execution
 environment, widely used and BSD licensed.
 endef
 
-$(eval $(call PyPackage,python-jinja2-klipper))
-$(eval $(call BuildPackage,python-jinja2-klipper))
-$(eval $(call BuildPackage,python-jinja2-klipper-src))
+$(eval $(call PyPackage,python2-jinja2))
+$(eval $(call BuildPackage,python2-jinja2))

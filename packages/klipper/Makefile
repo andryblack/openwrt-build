@@ -20,15 +20,14 @@ HOST_PYTHON_PACKAGE_BUILD_DEPENDS:="cffi==1.12.2"
 #PKG_BUILD_DEPENDS:=premake5/host lua53static
 
 include $(INCLUDE_DIR)/package.mk
-include $(INCLUDE_DIR)/../feeds/packages/lang/python/python-package.mk
+include $(INCLUDE_DIR)/../feeds/custom/python-package.mk
 
 define Package/klipper
 	SECTION:=utils
 	CATEGORY:=Applications
 	TITLE:=3D printing firmware host
 	URL:=https://www.klipper3d.org/
-	DEPENDS:=+python-light +python-pyserial +python-cffi-klipper +python-jinja2-klipper +python-greenlet-klipper \
-		+python-logging +python-codecs +rpi-zero-prepare
+	DEPENDS:=+python2 +python2-pyserial +python2-cffi +python2-jinja2 +python2-greenlet +rpi-zero-prepare
 	USERID:=klipper:services
 	VARIANT:=python
 endef

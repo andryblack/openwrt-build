@@ -4,7 +4,7 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=python-greenlet-klipper
+PKG_NAME:=python2-greenlet
 PKG_VERSION:=0.4.15
 PKG_RELEASE:=1
 
@@ -21,26 +21,25 @@ PKG_LICENSE_FILES:=LICENSE
 PYTHON_PKG_SETUP_ARGS:=
 
 include $(INCLUDE_DIR)/package.mk
-include $(INCLUDE_DIR)/../feeds/packages/lang/python/python-package.mk
+include ../python-package.mk
 
 PKG_UNPACK:=$(HOST_TAR) -C $(PKG_BUILD_DIR) --strip-components=1 -xzf $(DL_DIR)/$(PKG_SOURCE)
 
-define Package/python-greenlet-klipper
+define Package/python2-greenlet
   SECTION:=lang
   CATEGORY:=Languages
   SUBMENU:=Python
   TITLE:=greenlet
   URL:=https://github.com/python-greenlet/greenlet
-  DEPENDS:=+python-light 
+  DEPENDS:=+python2
   VARIANT:=python
 endef
 
-define Package/python-greenlet-klipper/description
+define Package/python2-greenlet/description
 Greenlets are lightweight coroutines for in-process concurrent programming.
 endef
 
 
 
-$(eval $(call PyPackage,python-greenlet-klipper))
-$(eval $(call BuildPackage,python-greenlet-klipper))
-$(eval $(call BuildPackage,python-greenlet-klipper-src))
+$(eval $(call PyPackage,python2-greenlet))
+$(eval $(call BuildPackage,python2-greenlet))

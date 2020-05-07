@@ -23,7 +23,7 @@ define Package/omxplayer
   CATEGORY:=Applications
   TITLE:=omxplayer
   URL:=https://github.com/popcornmix/omxplayer/
-  DEPENDS:=+rpi-userland +libopenssl +alsa-lib +libpcre +boost +getopt +libfreetype +libbz2 
+  DEPENDS:=+bcm27xx-userland +libopenssl +alsa-lib +libpcre +boost +getopt +libfreetype +libbz2 
 endef
 
 define Package/omxplayer/description
