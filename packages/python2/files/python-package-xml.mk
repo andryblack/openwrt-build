@@ -5,16 +5,12 @@
 # See /LICENSE for more information.
 #
 
-define Package/python2-xml
-$(call Package/python/Default)
-  TITLE:=Python $(PYTHON_VERSION) xml libs
-  DEPENDS:=+python2-base +libexpat
-endef
 
 $(eval $(call PyBasePackage,python2-xml, \
 	/usr/lib/python$(PYTHON_VERSION)/xml \
 	/usr/lib/python$(PYTHON_VERSION)/xmllib.py \
 	/usr/lib/python$(PYTHON_VERSION)/xmlrpclib.py \
 	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/_elementtree.so \
-	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/pyexpat.so \
+	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/pyexpat.so, \
+	libexpat \
 ))

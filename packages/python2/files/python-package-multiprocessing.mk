@@ -5,12 +5,6 @@
 # See /LICENSE for more information.
 #
 
-define Package/python2-multiprocessing
-$(call Package/python2/Default)
-  TITLE:=Python $(PYTHON_VERSION) multiprocessing
-  DEPENDS:=+python2-base
-endef
-
 $(eval $(call PyBasePackage,python2-multiprocessing, \
 	/usr/lib/python$(PYTHON_VERSION)/multiprocessing \
 	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/_multiprocessing.so \

@@ -5,11 +5,6 @@
 # See /LICENSE for more information.
 #
 
-define Package/python2-decimal
-$(call Package/python2/Default)
-  TITLE:=Python $(PYTHON_VERSION) decimal module
-  DEPENDS:=+python2-base
-endef
 
 $(eval $(call PyBasePackage,python2-decimal, \
 	/usr/lib/python$(PYTHON_VERSION)/decimal.py \

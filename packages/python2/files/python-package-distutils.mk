@@ -5,11 +5,6 @@
 # See /LICENSE for more information.
 #
 
-define Package/python2-distutils
-$(call Package/python2/Default)
-  TITLE:=Python $(PYTHON_VERSION) distutils
-  DEPENDS:=+python2-base
-endef
 
 $(eval $(call PyBasePackage,python2-distutils, \
 	/usr/lib/python$(PYTHON_VERSION)/distutils \

@@ -5,13 +5,8 @@
 # See /LICENSE for more information.
 #
 
-define Package/python2-sqlite3
-$(call Package/python2/Default)
-  TITLE:=Python $(PYTHON_VERSION) sqlite3 module
-  DEPENDS:=+python2-base +libsqlite3
-endef
-
 $(eval $(call PyBasePackage,python2-sqlite3, \
 	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/_sqlite3.so \
-	/usr/lib/python$(PYTHON_VERSION)/sqlite3 \
+	/usr/lib/python$(PYTHON_VERSION)/sqlite3, \
+	libsqlite3 \
 ))

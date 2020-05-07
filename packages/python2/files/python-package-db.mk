@@ -5,14 +5,10 @@
 # See /LICENSE for more information.
 #
 
-define Package/python2-db
-$(call Package/python2/Default)
-  TITLE:=Python $(PYTHON_VERSION) db module
-  DEPENDS:=+python2-base +libdb47
-endef
 
 $(eval $(call PyBasePackage,python2-db, \
 	/usr/lib/python$(PYTHON_VERSION)/bsddb \
 	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/_bsddb.so \
-	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/dbm.so \
+	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/dbm.so, \
+	libdb47 \
 ))

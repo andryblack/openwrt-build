@@ -5,11 +5,6 @@
 # See /LICENSE for more information.
 #
 
-define Package/python2-compiler
-$(call Package/python2/Default)
-  TITLE:=Python $(PYTHON_VERSION) compiler module
-  DEPENDS:=+python2-base
-endef
 
 $(eval $(call PyBasePackage,python2-compiler, \
 	/usr/lib/python$(PYTHON_VERSION)/compiler \

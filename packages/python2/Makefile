@@ -38,70 +38,45 @@ HOST_BUILD_PARALLEL:=1
 PKG_BUILD_DIR:=$(BUILD_DIR)/Python-$(PKG_VERSION)
 HOST_BUILD_DIR:=$(BUILD_DIR_HOST)/Python-$(PKG_VERSION)
 
-PKG_CONFIG_DEPENDS:= \
-	CONFIG_PACKAGE_python2-pkg-resources \
-	CONFIG_PACKAGE_python2-setuptools CONFIG_PACKAGE_python2-pip \
-	CONFIG_PYTHON_BLUETOOTH_SUPPORT
-
+PKG_CONFIG_DEPENDS:= 
 PKG_BUILD_DEPENDS:=python2/host
 HOST_BUILD_DEPENDS:=bzip2/host expat/host
 
 include $(INCLUDE_DIR)/host-build.mk
 include $(INCLUDE_DIR)/package.mk
 
-define Package/python2/Default
+
+PYTHON_LIB_FILES_ADD:=
+PYTHON_PACKAGES:=
+PYTHON_PACKAGES_DEPENDS:=
+define PyBasePackage
+  PYTHON_PACKAGES+=$(1)
+  ifneq ($(3),)
+    PYTHON_PACKAGES_DEPENDS+=$(3)
+  endif
+  PYTHON_LIB_FILES_ADD+=$(2)
+endef
+
+include ./files/python-package-*.mk
+
+
+define Package/python2
   SUBMENU:=Python
   SECTION:=lang
   CATEGORY:=Languages
   TITLE:=Python $(PYTHON_VERSION) programming language
   URL:=https://www.python.org/
-  DEPENDS:=+libpthread +zlib
+  DEPENDS:=+libpthread +zlib +libffi +libbz2
+  DEPENDS+=$(foreach package,$(PYTHON_PACKAGES_DEPENDS),+$(package))
 endef
 
-define Package/python2/Default/description
+define Package/python2/description
  Python is a dynamic object-oriented programming language that can be used
  for many kinds of software development. It offers strong support for
  integration with other languages and tools, comes with extensive standard
  libraries, and can be learned in a few days. Many Python programmers
  report substantial productivity gains and feel the language encourages
  the development of higher quality, more maintainable code.
-endef
-
-
-PYTHON_LIB_FILES_DEL:=
-PYTHON_PACKAGES:=
-PYTHON_PACKAGES_DEPENDS:=
-define PyBasePackage
-  PYTHON_PACKAGES+=$(1)
-  ifeq ($(3),)
-    PYTHON_PACKAGES_DEPENDS+=$(1)
-  endif
-  PYTHON_LIB_FILES_DEL+=$(2)
-  define PyPackage/$(1)/filespec
-    ifneq ($(2),)
-      $(subst $(space),$(newline),$(foreach lib_file,$(2),+|$(lib_file)))
-      -|/usr/lib/python$(PYTHON_VERSION)/*/test
-      -|/usr/lib/python$(PYTHON_VERSION)/*/tests
-    endif
-  endef
-  PyPackage/$(1)/install?=:
-endef
-
-include ./files/python-package-*.mk
-
-define Package/python2-base
-$(call Package/python2/Default)
-  DEPENDS+=+libffi +libbz2
-endef
-
-define Package/python2
-$(call Package/python2/Default)
-  DEPENDS+=python2-base
-  DEPENDS+=$(foreach package,$(PYTHON_PACKAGES_DEPENDS),+$(package))
-endef
-
-define Package/python2/description
-  This package contains the (almost) full Python install.
 endef
 
 MAKE_FLAGS+=\
@@ -149,41 +124,7 @@ define Build/Prepare
 	$(CP) ./files/config.site $(PKG_BUILD_DIR)/config.site
 endef
 
-ifdef CONFIG_PACKAGE_python2-setuptools
-PYTHON_SETUPTOOLS_BUILD:=1
-endif
 
-ifdef CONFIG_PACKAGE_python2-pkg-resources
-PYTHON_SETUPTOOLS_BUILD:=1
-endif
-
-ifeq ($(PYTHON_SETUPTOOLS_BUILD),1)
-define Build/Compile/python2-setuptools
-	$(HOST_PYTHON_PIP) \
-		--disable-pip-version-check \
-		--cache-dir "$(DL_DIR)/pip-cache" \
-		install \
-		--ignore-installed \
-		--root=$(PKG_BUILD_DIR)/install-setuptools \
-		--prefix=/usr \
-		$(PKG_BUILD_DIR)/Lib/ensurepip/_bundled/setuptools-$(PYTHON_SETUPTOOLS_VERSION)-py2.py3-none-any.whl
-	$(call PatchDir,$(PKG_BUILD_DIR)/install-setuptools/usr/lib/python$(PYTHON_VERSION)/site-packages,./patches-setuptools,)
-endef
-endif # CONFIG_PACKAGE_python-setuptools
-
-ifdef CONFIG_PACKAGE_python2-pip
-define Build/Compile/python2-pip
-	$(HOST_PYTHON_PIP) \
-		--disable-pip-version-check \
-		--cache-dir "$(DL_DIR)/pip-cache" \
-		install \
-		--ignore-installed \
-		--root=$(PKG_BUILD_DIR)/install-pip \
-		--prefix=/usr \
-		$(PKG_BUILD_DIR)/Lib/ensurepip/_bundled/pip-$(PYTHON_PIP_VERSION)-py2.py3-none-any.whl
-	$(call PatchDir,$(PKG_BUILD_DIR)/install-pip/usr/lib/python$(PYTHON_VERSION)/site-packages,./patches-pip,)
-endef
-endif # CONFIG_PACKAGE_python-pip
 
 define Build/Compile
 	$(call Build/Compile/Default)
@@ -240,11 +181,6 @@ PYTHON_BASE_LIB_FILES:= \
 	/usr/lib/python$(PYTHON_VERSION)/UserDict.py \
 	/usr/lib/python$(PYTHON_VERSION)/warnings.py
 
-PYTHON_LIB_FILES_DEL+=$(PYTHON_BASE_LIB_FILES)
-
-define PyPackage/python2-base/install
-	
-endef
 
 define PyPackage/python2/install
 	$(INSTALL_DIR) $(1)/usr/bin $(1)/usr/lib
@@ -253,11 +189,16 @@ define PyPackage/python2/install
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libpython$(PYTHON_VERSION).so* $(1)/usr/lib/
 	$(SED) 's|$(TARGET_AR)|ar|g;s|$(TARGET_RANLIB)|ranlib|g;s|$(TARGET_CC)|gcc|g;s|$(TARGET_CXX)|g++|g' \
 		$(PKG_INSTALL_DIR)/usr/lib/python$(PYTHON_VERSION)/_sysconfigdata.py
+	$(CP) $(PKG_INSTALL_DIR)/usr/bin/python*config $(1)/usr/bin
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/python$(PYTHON_VERSION)/config/libpython$(PYTHON_VERSION).a $(1)/usr/lib
+	$(SED) 's|$(TARGET_AR)|ar|g;s|$(TARGET_RANLIB)|ranlib|g;s|$(TARGET_CC)|gcc|g;s|$(TARGET_CXX)|g++|g' \
+		$(PKG_INSTALL_DIR)/usr/lib/python$(PYTHON_VERSION)/config/Makefile
+	#$(INSTALL_DIR) $(1)/usr/lib/python$(PYTHON_VERSION)/site-packages
+	#$(CP) \
+	#	$(PKG_BUILD_DIR)/install-setuptools/usr/lib/python$(PYTHON_VERSION)/site-packages/pkg_resources \
+	#	$(1)/usr/lib/python$(PYTHON_VERSION)/site-packages
 endef
 
-define PyPackage/python2-base/filespec
-
-endef
 
 define PyPackage/python2/filespec
 +|/usr/bin/python$(PYTHON_VERSION)
@@ -274,7 +215,7 @@ define PyPackage/python2/filespec
 -|/usr/lib/python$(PYTHON_VERSION)/*/test
 -|/usr/lib/python$(PYTHON_VERSION)/*/tests
 -|/usr/lib/python$(PYTHON_VERSION)/lib-dynload/readline.so
-$(subst $(space),$(newline),$(foreach lib_file,$(PYTHON_LIB_FILES_DEL),-|$(lib_file)))
+$(subst $(space),$(newline),$(foreach lib_file,$(PYTHON_LIB_FILES_ADD),+|$(lib_file)))
 $(subst $(space),$(newline),$(foreach lib_file,$(PYTHON_BASE_LIB_FILES),+|$(lib_file)))
 -|$(PYTHON_PKG_DIR)
 endef
@@ -342,14 +283,6 @@ define Host/Install
 endef
 
 $(eval $(call HostBuild))
-
-$(foreach package, $(PYTHON_PACKAGES),  \
-	$(eval $(call PyPackage,$(package))) \
-	$(eval $(call BuildPackage,$(package))) \
-)
-
-$(eval $(call PyPackage,python2-base))
-$(eval $(call BuildPackage,python2-base))
 
 $(eval $(call PyPackage,python2))
 $(eval $(call BuildPackage,python2))

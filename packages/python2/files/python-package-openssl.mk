@@ -5,13 +5,9 @@
 # See /LICENSE for more information.
 #
 
-define Package/python2-openssl
-$(call Package/python2/Default)
-  TITLE:=Python $(PYTHON_VERSION) SSL module
-  DEPENDS:=+python2-base +libopenssl
-endef
 
 $(eval $(call PyBasePackage,python2-openssl, \
 	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/_hashlib.so \
-	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/_ssl.so \
+	/usr/lib/python$(PYTHON_VERSION)/lib-dynload/_ssl.so, \
+	libopenssl \
 ))

@@ -32,7 +32,7 @@ define Package/python2-jinja2
   SUBMENU:=Python
   TITLE:=Jinja2
   URL:=http://jinja.pocoo.org/
-  DEPENDS:=+python2 +python2-markup-safe +python2-decimal
+  DEPENDS:=+python2 +python2-markup-safe
   VARIANT:=python
 endef
 
