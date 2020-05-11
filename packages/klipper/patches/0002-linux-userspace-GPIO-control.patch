@@ -1,4 +1,4 @@
-From 058af342bf29edb9da572cdeb4c992af5a01c271 Mon Sep 17 00:00:00 2001
+From 3694a2f97a9d0782f4278d23d4f460ac9896e1a0 Mon Sep 17 00:00:00 2001
 From: andryblack <blackicebox@gmail.com>
 Date: Fri, 24 Apr 2020 00:16:31 +0300
 Subject: [PATCH] linux: userspace GPIO control
@@ -11,11 +11,11 @@ Signed-off-by: Andrey Kunitsyn <blackicebox@gmail.com>
  src/linux/Kconfig    |   2 +
  src/linux/Makefile   |   2 +-
  src/linux/analog.c   |   8 +-
- src/linux/gpio.c     | 171 +++++++++++++++++++++++++++++++++++++++++++
+ src/linux/gpio.c     | 175 +++++++++++++++++++++++++++++++++++++++++++
  src/linux/gpio.h     |  16 +++-
  src/linux/hard_pwm.c |   2 +-
  src/linux/spidev.c   |  12 ---
- 8 files changed, 193 insertions(+), 21 deletions(-)
+ 8 files changed, 197 insertions(+), 21 deletions(-)
  create mode 100644 src/linux/gpio.c
 
 diff --git a/.travis.yml b/.travis.yml
@@ -82,10 +82,10 @@ index 2ce085a8..aa8fb701 100644
      if (fd < 0) {
 diff --git a/src/linux/gpio.c b/src/linux/gpio.c
 new file mode 100644
-index 00000000..400f637d
+index 00000000..c1da4df2
 --- /dev/null
 +++ b/src/linux/gpio.c
-@@ -0,0 +1,171 @@
+@@ -0,0 +1,175 @@
 +// Very basic support via a Linux gpiod device
 +//
 +// Copyright (C) 2017-2018  Kevin O'Connor <kevin@koconnor.net>
@@ -113,15 +113,9 @@ index 00000000..400f637d
 +
 +DECL_ENUMERATION_RANGE("pin", "P0", 0, NUM_LINES);
 +
-+enum gpio_line_status {
-+    GPIO_STATUS_UNKNOWN,
-+    GPIO_STATUS_OUTPUT,
-+    GPIO_STATUS_INPUT
-+};
-+
 +struct gpio_line {
-+    gpio_line_status status;
-+    int line_fd;
++    int offset;
++    int fd;
 +    int state;
 +};
 +
@@ -132,7 +126,13 @@ index 00000000..400f637d
 +static void
 +close_chip_fd(void)
 +{
++    int i;
 +    if (gpio_chip_fd >= 0) {
++        for (i=0; i<NUM_LINES; ++i) {
++            if (lines[i].fd >= 0) {
++                close(lines[i].fd);
++            }
++        }
 +        close(gpio_chip_fd);
 +        gpio_chip_fd = -1;
 +    }
@@ -140,13 +140,18 @@ index 00000000..400f637d
 +
 +static int
 +get_chip_fd(void) {
++    int i = 0;
 +    if (gpio_chip_fd < 0) {
-+        gpio_chip_fd = open(CHIP_FILE_NAME,O_RDWR | O_CLOEXEC)
++        gpio_chip_fd = open(CHIP_FILE_NAME,O_RDWR | O_CLOEXEC);
 +        if (gpio_chip_fd < 0) {
 +            report_errno("open " CHIP_FILE_NAME,-1);
 +            shutdown("Unable to open GPIO chip device");
 +        }
 +        atexit(&close_chip_fd);
++        for (i=0; i<NUM_LINES; ++i) {
++            lines[i].offset = i;
++            lines[i].fd = -1;
++        }
 +    }
 +    return gpio_chip_fd;
 +}
@@ -156,6 +161,7 @@ index 00000000..400f637d
 +gpio_out_setup(uint32_t pin, uint8_t val)
 +{
 +    struct gpio_line* line = &lines[pin];
++    line->offset = pin;
 +    struct gpio_out g = { .line = line };
 +    gpio_out_reset(g,val);
 +    return g;
@@ -164,31 +170,30 @@ index 00000000..400f637d
 +static void
 +gpio_release_line(struct gpio_line* line)
 +{
-+    if (line->status != GPIO_STATUS_UNKNOWN) {
++    if (line->fd >= 0) {
 +        close(line->fd);
-+        line->status = GPIO_STATUS_UNKNOWN;
++        line->fd = -1;
 +    }
 +}
 +
 +void
 +gpio_out_reset(struct gpio_out g, uint8_t val)
 +{
-+    gpio_release_line(g.line);
++    int rv;
 +    struct gpiohandle_request req;
++    gpio_release_line(g.line);
 +    memset(&req, 0, sizeof(req));
 +    req.lines = 1;
 +    req.flags = GPIOHANDLE_REQUEST_OUTPUT;
-+    req.lineoffsets[0] = pin;
++    req.lineoffsets[0] = g.line->offset;
 +    req.default_values[0] = !!val;
 +    strncpy(req.consumer_label,GPIO_CONSUMER,sizeof(req.consumer_label) - 1);
 +    rv = ioctl(get_chip_fd(), GPIO_GET_LINEHANDLE_IOCTL, &req);
 +    if (rv < 0) {
 +        report_errno("gpio_out_reset get line",rv);
 +        shutdown("Unable to open out GPIO chip line");
-+        return NULL;
 +    }
 +    g.line->fd = req.fd;
-+    g.line->status = GPIO_STATUS_OUTPUT;
 +    g.line->state = !!val;
 +}
 +
@@ -203,9 +208,9 @@ index 00000000..400f637d
 +}
 +
 +void
-+gpio_out_write(struct gpio_out g)
++gpio_out_toggle(struct gpio_out g)
 +{
-+    gpiod_line_set_value(g,!g.line->state);
++    gpio_out_write(g,!g.line->state);
 +}
 +
 +void
@@ -218,7 +223,8 @@ index 00000000..400f637d
 +gpio_in_setup(uint32_t pin, int8_t pull_up)
 +{
 +    struct gpio_line* line = &lines[pin];
-+    struct gpio_out g = { .line = line };
++    line->offset = pin;
++    struct gpio_in g = { .line = line };
 +    gpio_in_reset(g,pull_up);
 +    return g;
 +}
@@ -226,8 +232,9 @@ index 00000000..400f637d
 +void
 +gpio_in_reset(struct gpio_in g, int8_t pull_up)
 +{
-+    gpio_release_line(g.line);
++    int rv;
 +    struct gpiohandle_request req;
++    gpio_release_line(g.line);
 +    memset(&req, 0, sizeof(req));
 +    req.lines = 1;
 +    req.flags = GPIOHANDLE_REQUEST_INPUT;
@@ -236,16 +243,14 @@ index 00000000..400f637d
 +        req.flags |= GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP;
 +    }
 +#endif
-+    req.lineoffsets[0] = pin;
++    req.lineoffsets[0] = g.line->offset;
 +    strncpy(req.consumer_label,GPIO_CONSUMER,sizeof(req.consumer_label) - 1);
 +    rv = ioctl(get_chip_fd(), GPIO_GET_LINEHANDLE_IOCTL, &req);
 +    if (rv < 0) {
 +        report_errno("gpio_out_reset get line",rv);
 +        shutdown("Unable to open in GPIO chip line");
-+        return NULL;
 +    }
 +    g.line->fd = req.fd;
-+    g.line->status = GPIO_STATUS_INPUT;
 +}
 +
 +uint8_t
@@ -253,7 +258,6 @@ index 00000000..400f637d
 +{
 +    struct gpiohandle_data data;
 +    memset(&data, 0, sizeof(data));
-+    data.values[0] = !!val;
 +    ioctl(g.line->fd, GPIOHANDLE_GET_LINE_VALUES_IOCTL, &data);
 +    return data.values[0];
 +}
