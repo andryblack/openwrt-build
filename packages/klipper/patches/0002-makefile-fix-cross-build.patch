@@ -1,19 +1,18 @@
-From 062941b6f0ec7ced3cf0cfff7362ee2445cb119b Mon Sep 17 00:00:00 2001
+From 9f3159f4715fc57280942d0da76209ba5538d6ec Mon Sep 17 00:00:00 2001
 From: andryblack <blackicebox@gmail.com>
 Date: Mon, 13 Apr 2020 01:27:27 +0300
-Subject: [PATCH 1/4] makefile: fix cross build
+Subject: [PATCH 2/3] makefile: fix cross build
 
 Fix build on different platforms
 
 Signed-off-by: Andrey Kunitsyn <blackicebox@gmail.com>
 ---
- Makefile             | 13 +++++++++++--
+ Makefile             | 11 ++++++++++-
  scripts/check-gcc.sh |  4 ++--
- src/linux/main.c     |  2 +-
- 3 files changed, 14 insertions(+), 5 deletions(-)
+ 2 files changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index e38a7eb6..cb5e80e0 100644
+index 083b6880..44622e39 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -22,8 +22,17 @@ OBJCOPY=$(CROSS_PREFIX)objcopy
@@ -34,15 +33,6 @@ index e38a7eb6..cb5e80e0 100644
  # Source files
  src-y =
  dirs-y = src
-@@ -32,7 +41,7 @@ dirs-y = src
- cc-option=$(shell if test -z "`$(1) $(2) -S -o /dev/null -xc /dev/null 2>&1`" \
-     ; then echo "$(2)"; else echo "$(3)"; fi ;)
- 
--CFLAGS := -I$(OUT) -Isrc -I$(OUT)board-generic/ -std=gnu11 -O2 -MD -g \
-+CFLAGS := -iquote $(OUT) -iquote src -iquote $(OUT)board-generic/ -std=gnu11 -O2 -MD -g \
-     -Wall -Wold-style-definition $(call cc-option,$(CC),-Wtype-limits,) \
-     -ffunction-sections -fdata-sections
- CFLAGS += -flto -fwhole-program -fno-use-linker-plugin
 @@ -94,7 +103,7 @@ $(OUT)compile_time_request.o: $(patsubst %.c, $(OUT)src/%.o.ctr,$(src-y)) ./scri
  $(OUT)klipper.elf: $(OBJS_klipper.elf)
  	@echo "  Linking $@"
@@ -67,19 +57,6 @@ index 2d89d98f..7185fcbb 100755
  
  if [ "$s1" != "$s2" ]; then
      echo ""
-diff --git a/src/linux/main.c b/src/linux/main.c
-index 4c5478eb..f6e96abd 100644
---- a/src/linux/main.c
-+++ b/src/linux/main.c
-@@ -4,7 +4,7 @@
- //
- // This file may be distributed under the terms of the GNU GPLv3 license.
- 
--#include </usr/include/sched.h> // sched_setscheduler
-+#include <sched.h> // sched_setscheduler
- #include <stdio.h> // fprintf
- #include <string.h> // memset
- #include <unistd.h> // getopt
 -- 
 2.24.2 (Apple Git-127)
 

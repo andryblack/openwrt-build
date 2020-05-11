@@ -4,6 +4,6 @@
 
 group_exists video || group_add video 30
 group_exists gpio || group_add gpio 31
-group_exists services || group_add gpio 200
+group_exists services || group_add services 200
 
 exit 0

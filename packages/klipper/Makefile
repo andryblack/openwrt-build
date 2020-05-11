@@ -37,7 +37,7 @@ define Package/klipper-mcu
 	CATEGORY:=Applications
 	TITLE:=3D printing firmware mcu
 	URL:=https://www.klipper3d.org/
-	DEPENDS:=+rpi-zero-prepare
+	DEPENDS:=+rpi-zero-prepare +kmod-pwm-bcm2835
 	USERID:=klipper:services
 endef
 
