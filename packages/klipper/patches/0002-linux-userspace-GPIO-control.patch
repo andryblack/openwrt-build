@@ -1,57 +1,60 @@
-From f413a3a9f3d81da1b93c4e19f0f18d5ad26efb9a Mon Sep 17 00:00:00 2001
+From 058af342bf29edb9da572cdeb4c992af5a01c271 Mon Sep 17 00:00:00 2001
 From: andryblack <blackicebox@gmail.com>
 Date: Fri, 24 Apr 2020 00:16:31 +0300
-Subject: [PATCH 2/4] linux: userspace GPIO control via libgpiod
+Subject: [PATCH] linux: userspace GPIO control
 
 Allow use host GPIO pins for non-realtime purposes.
 
 Signed-off-by: Andrey Kunitsyn <blackicebox@gmail.com>
 ---
- src/linux/Kconfig    |   6 ++
- src/linux/Makefile   |   6 +-
- src/linux/analog.c   |   8 ++-
- src/linux/gpio.c     | 153 +++++++++++++++++++++++++++++++++++++++++++
- src/linux/gpio.h     |  26 ++++++--
+ .travis.yml          |   1 +
+ src/linux/Kconfig    |   2 +
+ src/linux/Makefile   |   2 +-
+ src/linux/analog.c   |   8 +-
+ src/linux/gpio.c     | 171 +++++++++++++++++++++++++++++++++++++++++++
+ src/linux/gpio.h     |  16 +++-
  src/linux/hard_pwm.c |   2 +-
- src/linux/spidev.c   |  12 ----
- 7 files changed, 190 insertions(+), 23 deletions(-)
+ src/linux/spidev.c   |  12 ---
+ 8 files changed, 193 insertions(+), 21 deletions(-)
  create mode 100644 src/linux/gpio.c
 
+diff --git a/.travis.yml b/.travis.yml
+index 49aee964..fa751640 100644
+--- a/.travis.yml
++++ b/.travis.yml
+@@ -1,5 +1,6 @@
+ # This is a travis-ci.org continuous integration configuration file.
+ language: c
++dist: bionic
+ 
+ addons:
+   apt:
 diff --git a/src/linux/Kconfig b/src/linux/Kconfig
-index 53fb22fe..2eee7d4f 100644
+index f4b51ffa..edf575b0 100644
 --- a/src/linux/Kconfig
 +++ b/src/linux/Kconfig
-@@ -11,6 +11,12 @@ config LINUX_SELECT
+@@ -10,6 +10,8 @@ config LINUX_SELECT
+     select HAVE_GPIO_SPI
      select HAVE_GPIO_HARD_PWM
      select HAVE_GPIO_I2C
- 
-+config USE_LIBGPIOD
-+    bool "Use libgpiod for GPIO support"
-+    default n
 +    select HAVE_GPIO_BITBANGING
 +    select HAVE_GPIO
-+
+ 
  config BOARD_DIRECTORY
      string
-     default "linux"
 diff --git a/src/linux/Makefile b/src/linux/Makefile
-index 5cc9c69a..f65bbafe 100644
+index 5cc9c69a..db3c913a 100644
 --- a/src/linux/Makefile
 +++ b/src/linux/Makefile
-@@ -4,9 +4,11 @@ dirs-y += src/linux src/generic
+@@ -4,7 +4,7 @@ dirs-y += src/linux src/generic
  
  src-y += linux/main.c linux/timer.c linux/console.c linux/watchdog.c
  src-y += linux/pca9685.c linux/spidev.c linux/analog.c linux/hard_pwm.c
 -src-y += linux/i2c.c generic/crc16_ccitt.c generic/alloc.c
 +src-y += linux/i2c.c linux/gpio.c generic/crc16_ccitt.c generic/alloc.c
  
--CFLAGS_klipper.elf += -lutil
-+libs-$(CONFIG_USE_LIBGPIOD) += -lgpiod
-+
-+CFLAGS_klipper.elf += -lutil $(libs-y)
+ CFLAGS_klipper.elf += -lutil
  
- flash: $(OUT)klipper.elf
- 	@echo "  Flashing"
 diff --git a/src/linux/analog.c b/src/linux/analog.c
 index 2ce085a8..aa8fb701 100644
 --- a/src/linux/analog.c
@@ -79,10 +82,10 @@ index 2ce085a8..aa8fb701 100644
      if (fd < 0) {
 diff --git a/src/linux/gpio.c b/src/linux/gpio.c
 new file mode 100644
-index 00000000..38c745ee
+index 00000000..400f637d
 --- /dev/null
 +++ b/src/linux/gpio.c
-@@ -0,0 +1,153 @@
+@@ -0,0 +1,171 @@
 +// Very basic support via a Linux gpiod device
 +//
 +// Copyright (C) 2017-2018  Kevin O'Connor <kevin@koconnor.net>
@@ -93,85 +96,116 @@ index 00000000..38c745ee
 +#include "command.h" // shutdown
 +#include "sched.h" // shutdown
 +
-+#if CONFIG_USE_LIBGPIOD
 +#include <fcntl.h> // open
 +#include <stdio.h> // snprintf
 +#include <string.h> // memset
 +#include <stdlib.h> // atexit
 +
 +#include "internal.h" // report_errno
-+#include <gpiod.h>
 +
++#include <linux/gpio.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
 +
-+static struct gpiod_chip * chip = NULL;
-+#define CHIP_NAME "gpiochip0"
++#define CHIP_FILE_NAME "/dev/gpiochip0"
++#define GPIO_CONSUMER "klipper"
++#define NUM_LINES 40
 +
-+DECL_ENUMERATION_RANGE("pin", "P0", 0, 40);
++DECL_ENUMERATION_RANGE("pin", "P0", 0, NUM_LINES);
++
++enum gpio_line_status {
++    GPIO_STATUS_UNKNOWN,
++    GPIO_STATUS_OUTPUT,
++    GPIO_STATUS_INPUT
++};
++
++struct gpio_line {
++    gpio_line_status status;
++    int line_fd;
++    int state;
++};
++
++static struct gpio_line lines[NUM_LINES];
++
++static int gpio_chip_fd = -1;
 +
 +static void
-+close_chip(void)
++close_chip_fd(void)
 +{
-+    gpiod_chip_close(chip);
++    if (gpio_chip_fd >= 0) {
++        close(gpio_chip_fd);
++        gpio_chip_fd = -1;
++    }
 +}
 +
-+static struct gpiod_chip*
-+get_chip(void) {
-+    if (chip == NULL) {
-+        chip = gpiod_chip_open_by_name(CHIP_NAME);
-+        if (chip == NULL) {
-+            report_errno("gpiod_chip_open_by_name",-1);
++static int
++get_chip_fd(void) {
++    if (gpio_chip_fd < 0) {
++        gpio_chip_fd = open(CHIP_FILE_NAME,O_RDWR | O_CLOEXEC)
++        if (gpio_chip_fd < 0) {
++            report_errno("open " CHIP_FILE_NAME,-1);
 +            shutdown("Unable to open GPIO chip device");
 +        }
-+        atexit(&close_chip);
++        atexit(&close_chip_fd);
 +    }
-+    return chip;
++    return gpio_chip_fd;
 +}
 +
 +// Dummy versions of gpio_out functions
 +struct gpio_out
 +gpio_out_setup(uint32_t pin, uint8_t val)
 +{
-+    int ret;
-+    struct gpiod_line* line = gpiod_chip_get_line(get_chip(), pin);
-+    if (line == NULL) {
-+        report_errno("gpiod_chip_get_line",-1);
-+        shutdown("Unable to open GPIO chip line");
-+    }
-+    if (gpiod_line_is_requested(line)) {
-+        gpiod_line_release(line);
-+    }
-+    if ((ret = gpiod_line_request_output(line,"klipper",val)) != 0) {
-+        report_errno("gpiod_line_request_output",ret);
-+        shutdown("Unable to request GPIO line output");
-+    }
-+    gpiod_line_set_value(line,val?1:0);
++    struct gpio_line* line = &lines[pin];
 +    struct gpio_out g = { .line = line };
++    gpio_out_reset(g,val);
 +    return g;
++}
++
++static void
++gpio_release_line(struct gpio_line* line)
++{
++    if (line->status != GPIO_STATUS_UNKNOWN) {
++        close(line->fd);
++        line->status = GPIO_STATUS_UNKNOWN;
++    }
 +}
 +
 +void
 +gpio_out_reset(struct gpio_out g, uint8_t val)
 +{
-+    int ret;
-+    if (gpiod_line_is_requested(g.line)) {
-+        gpiod_line_release(g.line);
++    gpio_release_line(g.line);
++    struct gpiohandle_request req;
++    memset(&req, 0, sizeof(req));
++    req.lines = 1;
++    req.flags = GPIOHANDLE_REQUEST_OUTPUT;
++    req.lineoffsets[0] = pin;
++    req.default_values[0] = !!val;
++    strncpy(req.consumer_label,GPIO_CONSUMER,sizeof(req.consumer_label) - 1);
++    rv = ioctl(get_chip_fd(), GPIO_GET_LINEHANDLE_IOCTL, &req);
++    if (rv < 0) {
++        report_errno("gpio_out_reset get line",rv);
++        shutdown("Unable to open out GPIO chip line");
++        return NULL;
 +    }
-+    if ((ret = gpiod_line_request_output(g.line,"klipper",val)) != 0) {
-+        report_errno("gpiod_line_request_output",ret);
-+        shutdown("Unable to reset GPIO line output");
-+    }
++    g.line->fd = req.fd;
++    g.line->status = GPIO_STATUS_OUTPUT;
++    g.line->state = !!val;
 +}
 +
 +void
 +gpio_out_write(struct gpio_out g, uint8_t val)
 +{
-+    gpiod_line_set_value(g.line,val?1:0);
++    struct gpiohandle_data data;
++    memset(&data, 0, sizeof(data));
++    data.values[0] = !!val;
++    ioctl(g.line->fd, GPIOHANDLE_SET_LINE_VALUES_IOCTL, &data);
++    g.line->state = !!val;
 +}
 +
 +void
-+gpio_out_toggle(struct gpio_out g)
++gpio_out_write(struct gpio_out g)
 +{
-+    gpiod_line_set_value(g.line,!gpiod_line_get_value(g.line));
++    gpiod_line_set_value(g,!g.line->state);
 +}
 +
 +void
@@ -183,73 +217,56 @@ index 00000000..38c745ee
 +struct gpio_in
 +gpio_in_setup(uint32_t pin, int8_t pull_up)
 +{
-+    int ret;
-+    struct gpiod_line * line = gpiod_chip_get_line(get_chip(), pin);
-+    if (line == NULL) {
-+        report_errno("gpiod_chip_get_line",-1);
-+        shutdown("Unable to open GPIO chip line");
-+    }
-+    if (gpiod_line_is_requested(line)) {
-+        gpiod_line_release(line);
-+    }
-+    if ((ret = gpiod_line_request_input_flags(line,"klipper",0)) != 0) {
-+        report_errno("gpiod_line_request_input_flags",ret);
-+        shutdown("Unable to request GPIO line input");
-+    }
-+    struct gpio_in g = { .line = line };
++    struct gpio_line* line = &lines[pin];
++    struct gpio_out g = { .line = line };
++    gpio_in_reset(g,pull_up);
 +    return g;
 +}
 +
 +void
 +gpio_in_reset(struct gpio_in g, int8_t pull_up)
 +{
-+    int ret;
-+    if (gpiod_line_is_requested(g.line)) {
-+        gpiod_line_release(g.line);
++    gpio_release_line(g.line);
++    struct gpiohandle_request req;
++    memset(&req, 0, sizeof(req));
++    req.lines = 1;
++    req.flags = GPIOHANDLE_REQUEST_INPUT;
++#if defined(GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP)
++    if (pull_up) {
++        req.flags |= GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP;
 +    }
-+    if ((ret = gpiod_line_request_input_flags(g.line,"klipper",0)) != 0) {
-+        report_errno("gpiod_line_request_input_flags",ret);
-+        shutdown("Unable to request GPIO line input");
++#endif
++    req.lineoffsets[0] = pin;
++    strncpy(req.consumer_label,GPIO_CONSUMER,sizeof(req.consumer_label) - 1);
++    rv = ioctl(get_chip_fd(), GPIO_GET_LINEHANDLE_IOCTL, &req);
++    if (rv < 0) {
++        report_errno("gpio_out_reset get line",rv);
++        shutdown("Unable to open in GPIO chip line");
++        return NULL;
 +    }
++    g.line->fd = req.fd;
++    g.line->status = GPIO_STATUS_INPUT;
 +}
 +
 +uint8_t
 +gpio_in_read(struct gpio_in g)
 +{
-+    return gpiod_line_get_value(g.line);
++    struct gpiohandle_data data;
++    memset(&data, 0, sizeof(data));
++    data.values[0] = !!val;
++    ioctl(g.line->fd, GPIOHANDLE_GET_LINE_VALUES_IOCTL, &data);
++    return data.values[0];
 +}
-+
-+#else
-+
-+
-+// Dummy versions of gpio_out functions
-+struct gpio_out
-+gpio_out_setup(uint8_t pin, uint8_t val)
-+{
-+    shutdown("gpio_out_setup not supported");
-+}
-+
-+void
-+gpio_out_write(struct gpio_out g, uint8_t val)
-+{
-+}
-+
-+
-+#endif
 diff --git a/src/linux/gpio.h b/src/linux/gpio.h
-index 32e76bf5..f09a73c7 100644
+index 32e76bf5..e6ef86bd 100644
 --- a/src/linux/gpio.h
 +++ b/src/linux/gpio.h
-@@ -2,19 +2,35 @@
- #define __LINUX_GPIO_H
- 
+@@ -4,17 +4,25 @@
  #include <stdint.h> // uint8_t
--
-+#include "autoconf.h"
-+#if CONFIG_USE_LIBGPIOD
+ 
  struct gpio_out {
 -    uint32_t pin;
-+    struct gpiod_line* line;
++    struct gpio_line* line;
  };
 -struct gpio_out gpio_out_setup(uint8_t pin, uint8_t val);
 +struct gpio_out gpio_out_setup(uint32_t pin, uint8_t val);
@@ -259,18 +276,11 @@ index 32e76bf5..f09a73c7 100644
  void gpio_out_write(struct gpio_out g, uint8_t val);
  
 +struct gpio_in {
-+    struct gpiod_line* line;
++    struct gpio_line* line;
 +};
 +struct gpio_in gpio_in_setup(uint32_t pin, int8_t pull_up);
 +void gpio_in_reset(struct gpio_in g, int8_t pull_up);
 +uint8_t gpio_in_read(struct gpio_in g);
-+#else
-+struct gpio_out {
-+    int dummy;
-+};
-+struct gpio_out gpio_out_setup(uint8_t pin, uint8_t val);
-+void gpio_out_write(struct gpio_out g, uint8_t val);
-+#endif
 +
  struct gpio_adc {
      int fd;
@@ -280,7 +290,7 @@ index 32e76bf5..f09a73c7 100644
  uint32_t gpio_adc_sample(struct gpio_adc g);
  uint16_t gpio_adc_read(struct gpio_adc g);
  void gpio_adc_cancel_sample(struct gpio_adc g);
-@@ -32,7 +48,7 @@ struct gpio_pwm {
+@@ -32,7 +40,7 @@ struct gpio_pwm {
      int fd;
      uint32_t period;
  };
@@ -290,12 +300,12 @@ index 32e76bf5..f09a73c7 100644
  
  struct i2c_config {
 diff --git a/src/linux/hard_pwm.c b/src/linux/hard_pwm.c
-index 25bfb2e7..00b39500 100644
+index f14b844b..cfe8b436 100644
 --- a/src/linux/hard_pwm.c
 +++ b/src/linux/hard_pwm.c
-@@ -31,7 +31,7 @@ DECL_ENUMERATION_RANGE("pin", "pwmchip3/pwm0", HARD_PWM(3, 0), 256);
- 
+@@ -37,7 +37,7 @@ DECL_ENUMERATION_RANGE("pin", "pwmchip7/pwm0", HARD_PWM(7, 0), 16);
  #define PWM_PATH "/sys/class/pwm/pwmchip%u/pwm%u/%s"
+ #define PWM_PATH_BB "/sys/class/pwm/pwm-%u:%u/%s"
  
 -struct gpio_pwm gpio_pwm_setup(uint8_t pin, uint32_t cycle_time, uint16_t val)
 +struct gpio_pwm gpio_pwm_setup(uint32_t pin, uint32_t cycle_time, uint16_t val)

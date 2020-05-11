@@ -12,7 +12,7 @@ PKG_RELEASE:=5
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/KevinOConnor/klipper.git
-PKG_SOURCE_VERSION:=07e8011f51667c2b61676b2c77a510569cbf1ec6
+PKG_SOURCE_VERSION:=787ed452c2abe3bad81ffaf732b0b2609e3534bb
 PKG_BUILD_DIR:=$(BUILD_DIR)/klipper-$(PKG_VERSION)
 
 HOST_PYTHON_PACKAGE_BUILD_DEPENDS:="cffi==1.12.2"
@@ -37,7 +37,7 @@ define Package/klipper-mcu
 	CATEGORY:=Applications
 	TITLE:=3D printing firmware mcu
 	URL:=https://www.klipper3d.org/
-	DEPENDS:=+libgpiod14 +rpi-zero-prepare
+	DEPENDS:=+rpi-zero-prepare
 	USERID:=klipper:services
 endef
 
