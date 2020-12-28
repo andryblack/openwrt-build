@@ -8,7 +8,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=pcb-printer-host
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=8
+PKG_RELEASE:=9
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/andryblack/pcb-printer-host.git
@@ -37,7 +37,7 @@ endef
 define Build/Configure
 	pkg-config --cflags lua-5.3
 	pkg-config --cflags yajl
-	cd $(PKG_BUILD_DIR) && premake5 gmake --os=linux
+	cd $(PKG_BUILD_DIR) && premake5 gmake --os=linux --board=rpi
 endef
 
 define Build/Compile
