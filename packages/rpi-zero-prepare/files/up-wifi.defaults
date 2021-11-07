@@ -6,14 +6,18 @@ uci set wireless.default_radio0.mode='sta'
 uci set wireless.default_radio0.network='wwan'
 uci set wireless.default_radio0.ssid='openwrt'
 uci set wireless.default_radio0.key='openwrt1234'
+uci set wireless.default_radio0.ifname='wlan0'
 uci commit wireless
-uci set network.wwan=interface
+uci set network.wwan='interface'
 uci set network.wwan.proto='dhcp'
+uci set network.wwan.iface='wlan0'
+
+uci delete network.@device[0]
 uci delete network.lan
 uci delete network.br-lan
 uci commit network
 
-uci set firewall.@zone[1]=zone
+uci set firewall.@zone[1]='zone'
 uci set firewall.@zone[1].name='wwan'
 uci set firewall.@zone[1].input='ACCEPT'
 uci set firewall.@zone[1].output='ACCEPT'
