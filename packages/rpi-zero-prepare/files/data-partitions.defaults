@@ -1,5 +1,7 @@
 #!/bin/sh
 
+if [ -f /boot/data.txt ]; then
+
 crnt_blocks=`block info | grep "/dev/mmcblk0p3"`
 if [ "x$crnt_blocks" == "x" ]; then
 	echo "make new partition";
@@ -36,6 +38,8 @@ fi
 
 if [ -f /boot/diagnostic ]; then
 	logread > /boot/partitioning-log.txt
+fi
+
 fi
 
 exit 0

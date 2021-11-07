@@ -8,7 +8,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=rpi-zero-prepare
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -16,7 +16,7 @@ define Package/rpi-zero-prepare
   SECTION:=base
   CATEGORY:=Base system
   TITLE:=Initialize RPi zero
-  DEPENDS:=+fdisk +e2fsprogs +uci +kmod-usb-gadget-serial
+  DEPENDS:=+fdisk +e2fsprogs +uci +kmod-usb-gadget-serial +kmod-usb-dwc2 +wireless-tools +@BUSYBOX_CONFIG_GETTY
 endef
 
 define Package/rpi-zero-prepare/description

@@ -10,6 +10,10 @@ boot() {
 		firstboot -y
 		echo "force firstboot"
 		rm -f /boot/reset.txt
+
+		if [ -f /boot/diagnostic ]; then
+			logread > /boot/reset-log.txt
+		fi
 		reboot -d 0
 		exit 0
 	fi
@@ -20,9 +24,17 @@ boot() {
 		crnt_host=`uci get system.@system[0].hostname`
 		source /boot/setup.txt
 
+		if [ -f /boot/diagnostic ]; then
+			logread >> /boot/setup-log.txt
+		fi
+
 		if [ "x$host" != "x" ] && [ "x$crnt_host" != "x$host" ]; then
 			uci set system.@system[0].hostname=$host
 			uci commit system
+
+			if [ -f /boot/diagnostic ]; then
+				echo "host change" >> /boot/setup-log.txt
+			fi
 			/etc/init.d/system restart
 			if [ -f /etc/init.d/avahi-daemon ]; then
 				/etc/init.d/avahi-daemon restart
@@ -32,11 +44,11 @@ boot() {
 
 		commit_wireless="no"
 		if [ "x$ssid" != "x" ] && [ "x$crnt_ssid" != "x$ssid" ]; then
-			uci set wireless.@wifi-iface[0].ssid=$ssid
+			uci set wireless.default_radio0.ssid=$ssid
 			commit_wireless="yes"
 		fi
 		if [ "x$key" != "x" ] && [ "x$crnt_key" != "x$key" ]; then
-			uci set wireless.@wifi-iface[0].key=$key
+			uci set wireless.default_radio0.key=$key
 			commit_wireless="yes"
 		fi
 		if [ "x$commit_wireless" != "xno" ]; then
@@ -49,6 +61,13 @@ boot() {
 		if [ ! -f /etc/modules.d/53-g-serial ]; then
 			echo "g_serial" > /etc/modules.d/53-g-serial
 			echo "ttyGS0::respawn:/sbin/getty -L -w -n 115200 /dev/ttyGS0" >> /etc/inittab
+
+			if [ -f /boot/diagnostic ]; then
+				logread > /boot/usb-serial-log.txt
+			fi
+
+			reboot -d 0
+			exit 0
 		fi
 	else
 		if [ -f /etc/modules.d/53-g-serial ]; then
